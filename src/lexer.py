@@ -11,8 +11,8 @@ tokens = [
     'ID',               # 标识符
     'INT',              # 10进制数字
     'HEXADECIMAL',      # 16进制数字
-    'FLOAT',            # 浮点数
-    'SCIFLOAT',         # 科学计数法浮点数
+    'FLOAT',            # 32位浮点数
+    'DOUBLE',           # 64位浮点数
     'STRING',           # 字符串
     'PLUS',             # +
     'MINUS',            # -
@@ -120,6 +120,7 @@ t_DOT           = r'\.'
 t_SEMICOLON     = r';'
 
 
+
 # 匹配到泛型类型声明的第一个<，进入泛型状态
 def t_generics(t):
     r'\<'
@@ -160,15 +161,12 @@ def t_generics_error(t):
     t.lexer.skip(1)
 
 
-# 科学计数法浮点匹配规则
-def t_SCIFLOAT(t):
-    r'-?\d*\.?\d+e[+-]?\d+'
-    t.value = float(t.value)
-    return t
-
-# 浮点匹配规则
-def t_INITIAL_FLOAT(t):
-    r'[-+]?(([0-9]*\.[0-9]+)|([0-9]+\.))(f|F)?'
+# b不同精度浮点数匹配规则
+def t_FLOAT(t):
+    # r'[-+]?(([0-9]*\.[0-9]+)|([0-9]+\.))(f|F)?'  # 普通浮点计数
+    # r'[+-]*\d+\.?\d*[Ee]*[+-]*\d+(f|F)?'  # 原版有问题的合并计数
+    r'[+-]*(([0-9]*\.[0-9]+)|([0-9]+\.))[Ee]*[+-]*\d+(f|F)?'
+    t.type = 'FLOAT' if t.value[-1] == ('f' or 'F') else 'DOUBLE'
     t.value = float(t.value[:-1] if t.value[-1] == ('f' or 'F') else t.value)
     return t
 
@@ -221,78 +219,7 @@ def t_error(t):
 lexer = lex.lex()
 
 # Test it out
-data = '''
-    type vec3 = f32[3];
-type mat3 = f32[3][3];
-
-func normalize<T>(v: T[] ref) -> T[] ref {
-    
-}
-
-let time : f32 = in("time");
-let result : f32 ref = out("result");
-let v : vec3 = [1.0f, 2.0f, 3.0f];
-const a = 1, b = 2;
-
-interface Geometry {
-    func getPosition(self) -> vec3;
-};
-
-struct Sphere : Geometry {
-    center : vec3;
-    radius : f32;
-    func intersect(self, s : Sphere ref) -> bool {
-        return self.center - s.center
-    }
-    func operator f32(self) {
-        return self.radius;
-    }
-};
-
-func F(g : Geometry) -> void;
-
-let z = func(x) { return x*x; };
-let w : func(_: i32) -> i32 = z;
-
-func max<T>(array: T[] ref) -> T;
-func max<T, U>(array: T[] ref) -> U;
-
-sturct Meter<Meter<T>> {
-    l : T;
-};
-
-struct CentiMeter {
-    func type Meter(self) {
-        return Meter(self.l / 100.0f);
-    }
-    l : f32;
-};
-
-func convert(f32<m> a) -> f32<cm> {
-    return f32<cm>(f32(a) * 100);
-}
-
-let length : M<f32> = 1;
-func calcArea(length : f32<cm>) -> f32<cm*cm>;
-calcArea(length);
-
-let _rand = 0.0f;
-func rand() -> f32 {
-    _rand = sin();
-    return _rand;
-}
-func time() -> f32;
-
-let main() {
-    let x = rand();
-    let s1 : Sphere, s2 : Sphere;
-    s1.intersect(s2);
-}
-
-if (a > b){
-    a = b
-}
-'''
+data = 'aasd  12.123e2f  0.123e2f'
 
 # Give the lexer some input
 lexer.input(data)
