@@ -40,8 +40,8 @@ tokens = [
     'RPAREN',           # )
     'LBRACKET',         # [
     'RBRACKET',         # ]
-    # 'LANGRBRACKET',     # <
-    # 'RANGRBRACKET',     # >
+    'LANGRBRACKET',     # <
+    'RANGRBRACKET',     # >
     'LBRACE',           # {
     'RBRACE',           # }
     'COMMA',            # ,
@@ -110,11 +110,11 @@ t_GREATER_EQUAL = r'>='
 t_ASSIGN        = r'='
 t_LPAREN        = r'\('
 t_RPAREN        = r'\)'
-t_LBRACKET     = r'\['
-t_RBRACKET     = r'\]'
+t_LBRACKET      = r'\['
+t_RBRACKET      = r'\]'
 t_LBRACE        = r'\{'
 t_RBRACE        = r'\}'
-t_ANY_COMMA         = r','
+t_ANY_COMMA     = r','
 t_COLON         = r':'
 t_DOT           = r'\.'
 t_SEMICOLON     = r';'
@@ -126,25 +126,29 @@ def t_generics(t):
     t.lexer.code_start = t.lexer.lexpos  # Record the starting position
     t.lexer.level = 1  # Initial brace level
     t.lexer.begin('generics')  # Enter 'generics' state
-
+    t.type = 'LANGRBRACKET'
+    t.value = '<'
+    return t
 
 # 泛型状态规则
-def t_generics_langbracket(t):
+def t_generics_LANGRBRACKET(t):
     r'\<'
     t.lexer.level += 1
+    return t
 
 
-def t_generics_rangbracket(t):
+def t_generics_RANGRBRACKET(t):
     r'\>'
     t.lexer.level -= 1
 
     # If closing brace, return the code fragment
     if t.lexer.level == 0:
-        t.value = t.lexer.lexdata[t.lexer.code_start-1:t.lexer.lexpos]
-        t.type = "GENERICS"
+        # t.value = t.lexer.lexdata[t.lexer.code_start-1:t.lexer.lexpos]
+        # t.type = "GENERICS"
         t.lexer.lineno += t.value.count('\n')
         t.lexer.begin('INITIAL')
-        return t
+    return t
+
 
 
 # 忽略空格
@@ -253,7 +257,7 @@ let w : func(_: i32) -> i32 = z;
 func max<T>(array: T[] ref) -> T;
 func max<T, U>(array: T[] ref) -> U;
 
-sturct Meter<T> {
+sturct Meter<Meter<T>> {
     l : T;
 };
 
