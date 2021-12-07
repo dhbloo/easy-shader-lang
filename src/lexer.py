@@ -214,93 +214,22 @@ def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
 
+if __name__ == '__main__':
 
-# Build the lexer
-lexer = lex.lex()
+    # Build the lexer
+    lexer = lex.lex()
 
-# Test it out
-data = '''
-type vec3 = f32[3];
-type mat3 = f32[3][3];
+    # Test it out
+    data = 'aasd  12.123e2f  0.123e2f'
 
-func normalize<T>(v: T[] ref) -> T[] ref {
-    
-}
+    # Give the lexer some input
+    lexer.input(data)
 
-let time : f32 = in("time");
-let result : f32 ref = out("result");
-let v : vec3 = [1.0f, 2.0f, 3.0f];
-const a = 1, b = 2;
-
-interface Geometry {
-    func getPosition(self) -> vec3;
-};
-
-struct Sphere : Geometry {
-    center : vec3;
-    radius : f32;
-    func intersect(self, s : Sphere ref) -> bool {
-        return self.center - s.center
-    }
-    func operator f32(self) {
-        return self.radius;
-    }
-};
-
-func F(g : Geometry) -> void;
-
-let z = func(x) { return x*x; };
-let w : func(_: i32) -> i32 = z;
-
-func max<T>(array: T[] ref) -> T;
-func max<T, U>(array: T[] ref) -> U;
-
-sturct Meter<T> {
-    l : T;
-};
-
-type A = Meter<Meter<i32>>;
-
-struct CentiMeter {
-    func type Meter(self) {
-        return Meter(self.l / 100.0f);
-    }
-    l : f32;
-};
-
-func convert(f32<m> a) -> f32<cm> {
-    return f32<cm>(f32(a) * 100);
-}
-
-let length : M<f32> = 1;
-func calcArea(length : f32<cm>) -> f32<cm*cm>;
-calcArea(length);
-
-let _rand = 0.0f;
-func rand() -> f32 {
-    _rand = sin();
-    return _rand;
-}
-func time() -> f32;
-
-let main() {
-    let x = rand();
-    let s1 : Sphere, s2 : Sphere;
-    s1.intersect(s2);
-    if (a > b){
-        a = b
-    }
-}
-'''
-
-# Give the lexer some input
-lexer.input(data)
-
-# Tokenize
-while True:
-    tok = lexer.token()
-    if not tok:
-        break  # No more input
-    print(tok)
+    # Tokenize
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break  # No more input
+        print(tok)
 
 

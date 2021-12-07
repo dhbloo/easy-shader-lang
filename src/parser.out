@@ -1,0 +1,372 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Unused terminals:
+
+    AND
+    ASSIGN
+    BOOL
+    BREAK
+    COLON
+    COMMA
+    CONST
+    CONTINUE
+    DOT
+    DOUBLE
+    ELSE
+    EQUAL
+    F16
+    F32
+    F64
+    FLOAT
+    FOR
+    FUNC
+    GENERICS
+    GREATER
+    GREATER_EQUAL
+    HEXADECIMAL
+    I16
+    I32
+    I8
+    ID
+    IF
+    IN
+    INTERFACE
+    LANGRBRACKET
+    LBRACE
+    LBRACKET
+    LESS
+    LESS_EQUAL
+    LET
+    LOGICAL_AND
+    LOGICAL_NOT
+    LOGICAL_OR
+    LSHIFT
+    MOD
+    NOT
+    NOT_EQUAL
+    OR
+    OUT
+    RANGRBRACKET
+    RBRACE
+    RBRACKET
+    RETURN
+    RETURNTYPE
+    RSHIFT
+    SAMPLER
+    SEMICOLON
+    STRING
+    STRUCT
+    TYPE
+    U16
+    U32
+    U8
+    VOID
+    WHILE
+    XOR
+    ref
+
+Grammar
+
+Rule 0     S' -> expression
+Rule 1     expression -> expression PLUS term
+Rule 2     expression -> expression MINUS term
+Rule 3     expression -> term
+Rule 4     term -> term MUL factor
+Rule 5     term -> term DIV factor
+Rule 6     term -> factor
+Rule 7     factor -> INT
+Rule 8     factor -> LPAREN expression RPAREN
+
+Terminals, with rules where they appear
+
+AND                  : 
+ASSIGN               : 
+BOOL                 : 
+BREAK                : 
+COLON                : 
+COMMA                : 
+CONST                : 
+CONTINUE             : 
+DIV                  : 5
+DOT                  : 
+DOUBLE               : 
+ELSE                 : 
+EQUAL                : 
+F16                  : 
+F32                  : 
+F64                  : 
+FLOAT                : 
+FOR                  : 
+FUNC                 : 
+GENERICS             : 
+GREATER              : 
+GREATER_EQUAL        : 
+HEXADECIMAL          : 
+I16                  : 
+I32                  : 
+I8                   : 
+ID                   : 
+IF                   : 
+IN                   : 
+INT                  : 7
+INTERFACE            : 
+LANGRBRACKET         : 
+LBRACE               : 
+LBRACKET             : 
+LESS                 : 
+LESS_EQUAL           : 
+LET                  : 
+LOGICAL_AND          : 
+LOGICAL_NOT          : 
+LOGICAL_OR           : 
+LPAREN               : 8
+LSHIFT               : 
+MINUS                : 2
+MOD                  : 
+MUL                  : 4
+NOT                  : 
+NOT_EQUAL            : 
+OR                   : 
+OUT                  : 
+PLUS                 : 1
+RANGRBRACKET         : 
+RBRACE               : 
+RBRACKET             : 
+RETURN               : 
+RETURNTYPE           : 
+RPAREN               : 8
+RSHIFT               : 
+SAMPLER              : 
+SEMICOLON            : 
+STRING               : 
+STRUCT               : 
+TYPE                 : 
+U16                  : 
+U32                  : 
+U8                   : 
+VOID                 : 
+WHILE                : 
+XOR                  : 
+error                : 
+ref                  : 
+
+Nonterminals, with rules where they appear
+
+expression           : 1 2 8 0
+factor               : 4 5 6
+term                 : 1 2 3 4 5
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . expression
+    (1) expression -> . expression PLUS term
+    (2) expression -> . expression MINUS term
+    (3) expression -> . term
+    (4) term -> . term MUL factor
+    (5) term -> . term DIV factor
+    (6) term -> . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    expression                     shift and go to state 1
+    term                           shift and go to state 2
+    factor                         shift and go to state 3
+
+state 1
+
+    (0) S' -> expression .
+    (1) expression -> expression . PLUS term
+    (2) expression -> expression . MINUS term
+
+    PLUS            shift and go to state 6
+    MINUS           shift and go to state 7
+
+
+state 2
+
+    (3) expression -> term .
+    (4) term -> term . MUL factor
+    (5) term -> term . DIV factor
+
+    PLUS            reduce using rule 3 (expression -> term .)
+    MINUS           reduce using rule 3 (expression -> term .)
+    $end            reduce using rule 3 (expression -> term .)
+    RPAREN          reduce using rule 3 (expression -> term .)
+    MUL             shift and go to state 8
+    DIV             shift and go to state 9
+
+
+state 3
+
+    (6) term -> factor .
+
+    MUL             reduce using rule 6 (term -> factor .)
+    DIV             reduce using rule 6 (term -> factor .)
+    PLUS            reduce using rule 6 (term -> factor .)
+    MINUS           reduce using rule 6 (term -> factor .)
+    $end            reduce using rule 6 (term -> factor .)
+    RPAREN          reduce using rule 6 (term -> factor .)
+
+
+state 4
+
+    (7) factor -> INT .
+
+    MUL             reduce using rule 7 (factor -> INT .)
+    DIV             reduce using rule 7 (factor -> INT .)
+    PLUS            reduce using rule 7 (factor -> INT .)
+    MINUS           reduce using rule 7 (factor -> INT .)
+    $end            reduce using rule 7 (factor -> INT .)
+    RPAREN          reduce using rule 7 (factor -> INT .)
+
+
+state 5
+
+    (8) factor -> LPAREN . expression RPAREN
+    (1) expression -> . expression PLUS term
+    (2) expression -> . expression MINUS term
+    (3) expression -> . term
+    (4) term -> . term MUL factor
+    (5) term -> . term DIV factor
+    (6) term -> . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    expression                     shift and go to state 10
+    term                           shift and go to state 2
+    factor                         shift and go to state 3
+
+state 6
+
+    (1) expression -> expression PLUS . term
+    (4) term -> . term MUL factor
+    (5) term -> . term DIV factor
+    (6) term -> . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    term                           shift and go to state 11
+    factor                         shift and go to state 3
+
+state 7
+
+    (2) expression -> expression MINUS . term
+    (4) term -> . term MUL factor
+    (5) term -> . term DIV factor
+    (6) term -> . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    term                           shift and go to state 12
+    factor                         shift and go to state 3
+
+state 8
+
+    (4) term -> term MUL . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    factor                         shift and go to state 13
+
+state 9
+
+    (5) term -> term DIV . factor
+    (7) factor -> . INT
+    (8) factor -> . LPAREN expression RPAREN
+
+    INT             shift and go to state 4
+    LPAREN          shift and go to state 5
+
+    factor                         shift and go to state 14
+
+state 10
+
+    (8) factor -> LPAREN expression . RPAREN
+    (1) expression -> expression . PLUS term
+    (2) expression -> expression . MINUS term
+
+    RPAREN          shift and go to state 15
+    PLUS            shift and go to state 6
+    MINUS           shift and go to state 7
+
+
+state 11
+
+    (1) expression -> expression PLUS term .
+    (4) term -> term . MUL factor
+    (5) term -> term . DIV factor
+
+    PLUS            reduce using rule 1 (expression -> expression PLUS term .)
+    MINUS           reduce using rule 1 (expression -> expression PLUS term .)
+    $end            reduce using rule 1 (expression -> expression PLUS term .)
+    RPAREN          reduce using rule 1 (expression -> expression PLUS term .)
+    MUL             shift and go to state 8
+    DIV             shift and go to state 9
+
+
+state 12
+
+    (2) expression -> expression MINUS term .
+    (4) term -> term . MUL factor
+    (5) term -> term . DIV factor
+
+    PLUS            reduce using rule 2 (expression -> expression MINUS term .)
+    MINUS           reduce using rule 2 (expression -> expression MINUS term .)
+    $end            reduce using rule 2 (expression -> expression MINUS term .)
+    RPAREN          reduce using rule 2 (expression -> expression MINUS term .)
+    MUL             shift and go to state 8
+    DIV             shift and go to state 9
+
+
+state 13
+
+    (4) term -> term MUL factor .
+
+    MUL             reduce using rule 4 (term -> term MUL factor .)
+    DIV             reduce using rule 4 (term -> term MUL factor .)
+    PLUS            reduce using rule 4 (term -> term MUL factor .)
+    MINUS           reduce using rule 4 (term -> term MUL factor .)
+    $end            reduce using rule 4 (term -> term MUL factor .)
+    RPAREN          reduce using rule 4 (term -> term MUL factor .)
+
+
+state 14
+
+    (5) term -> term DIV factor .
+
+    MUL             reduce using rule 5 (term -> term DIV factor .)
+    DIV             reduce using rule 5 (term -> term DIV factor .)
+    PLUS            reduce using rule 5 (term -> term DIV factor .)
+    MINUS           reduce using rule 5 (term -> term DIV factor .)
+    $end            reduce using rule 5 (term -> term DIV factor .)
+    RPAREN          reduce using rule 5 (term -> term DIV factor .)
+
+
+state 15
+
+    (8) factor -> LPAREN expression RPAREN .
+
+    MUL             reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+    DIV             reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+    PLUS            reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+    MINUS           reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+    $end            reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+    RPAREN          reduce using rule 8 (factor -> LPAREN expression RPAREN .)
+

@@ -1,52 +1,78 @@
+# Yacc example
+# import ply.lex as lex
 import ply.yacc as yacc
-
 # Get the token map from the lexer.  This is required.
-from lexer import tokens
+from lexer import *
+
+'''
+translation-unit = { block-declaration | function-definition } ;
+block-declaration = type-decl | variable-decl | constant-decl | function-decl ";" ;
+type-decl = type-alias-decl | struct-decl | interface-decl ;
+type-alias-decl = "type" identifier "=" type-specifier ;
+variable-decl = "let" declarator { "," declarator } ;
+constant-decl = "const" declarator { "," declarator } ;
+declarator = identifier [ ":" type-specifier ] initializer ;
+function-decl = "func" identifier function-signature ;
+function-definition = function-decl block-statement ;
+'''
 
 def p_expression_plus(p):
     'expression : expression PLUS term'
     p[0] = p[1] + p[3]
 
+
 def p_expression_minus(p):
     'expression : expression MINUS term'
     p[0] = p[1] - p[3]
+
 
 def p_expression_term(p):
     'expression : term'
     p[0] = p[1]
 
-def p_term_times(p):
-    'term : term TIMES factor'
+
+def p_term_mul(p):
+    'term : term MUL factor'
     p[0] = p[1] * p[3]
 
+
 def p_term_div(p):
-    'term : term DIVIDE factor'
+    'term : term DIV factor'
     p[0] = p[1] / p[3]
+
 
 def p_term_factor(p):
     'term : factor'
     p[0] = p[1]
 
+
 def p_factor_num(p):
-    'factor : NUMBER'
+    'factor : INT'
     p[0] = p[1]
+
+def p_factor_():
+
+
 
 def p_factor_expr(p):
     'factor : LPAREN expression RPAREN'
     p[0] = p[2]
 
+
 # Error rule for syntax errors
 def p_error(p):
     print("Syntax error in input!")
 
+
+# lexer = lex.lex()
 # Build the parser
 parser = yacc.yacc()
 
 while True:
-   try:
-       s = raw_input('calc > ')
-   except EOFError:
-       break
-   if not s: continue
-   result = parser.parse(s)
-   print(result)
+    try:
+        s = input('calc > ')
+    except EOFError:
+        break
+    if not s: continue
+    result = parser.parse(s)
+    print(result)
