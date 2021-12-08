@@ -23,7 +23,7 @@ tokens = [
     'MUL',              # *
     'DIV',              # /
     'MOD',              # %
-    'RETURNTYPE',       # ->
+    'ASSIGNTYPE',       # ->
     'LSHIFT',           # <<
     'RSHIFT',           # >>
     'LOGICAL_OR',       # ||
@@ -55,16 +55,18 @@ reserved = {
     'let'       : 'LET',
     'in'        : 'IN',
     'out'       : 'OUT',
-    'ref'       : 'ref',
+    'ref'       : 'REF',
     'type'      : 'TYPE',
     'void'      : 'VOID',
     'bool'      : 'BOOL',
     'i8'        : 'I8',
     'i16'       : 'I16',
     'i32'       : 'I32',
+    'i64'       : 'I64',
     'u8'        : 'U8',
     'u16'       : 'U16',
     'u32'       : 'U32',
+    'u64'       : 'U64',
     'f16'       : 'F16',
     'f32'       : 'F32',
     'f64'       : 'F64',
@@ -95,7 +97,7 @@ t_NOT           = r'~'
 t_MUL           = r'\*'
 t_DIV           = r'/'
 t_MOD           = r'%'
-t_RETURNTYPE    = r'->'
+t_ASSIGNTYPE    = r'->'
 t_LSHIFT        = r'<<'
 t_RSHIFT        = r'>>'
 t_LOGICAL_OR    = r'\|\|'
@@ -163,9 +165,10 @@ def t_generics_error(t):
 
 # b不同精度浮点数匹配规则
 def t_FLOAT(t):
-    # r'[-+]?(([0-9]*\.[0-9]+)|([0-9]+\.))(f|F)?'  # 普通浮点计数
-    # r'[+-]*\d+\.?\d*[Ee]*[+-]*\d+(f|F)?'  # 原版有问题的合并计数
-    r'[+-]*(([0-9]*\.[0-9]+)|([0-9]+\.))[Ee]*[+-]*\d+(f|F)?'
+    r'[-+]?(([0-9]*\.[0-9]+)|([0-9]+\.))(f|F)?'  # 普通浮点计数
+    # r'[+-]*\d+\.?\d*[Ee]*[+-]*\d+(f|F)?'  # 原版有问题的合并计数,不能如.123
+    # r'[+-]*\d+\.\d+([Ee]-?\d+)?'
+    # r'[+-]*\d*\.?\d*[Ee]*[+-]*\d+(f|F)?'
     t.type = 'FLOAT' if t.value[-1] == ('f' or 'F') else 'DOUBLE'
     t.value = float(t.value[:-1] if t.value[-1] == ('f' or 'F') else t.value)
     return t
@@ -220,7 +223,7 @@ if __name__ == '__main__':
     lexer = lex.lex()
 
     # Test it out
-    data = 'aasd  12.123e2f  0.123e2f'
+    data = '1 0.2 1'
 
     # Give the lexer some input
     lexer.input(data)
