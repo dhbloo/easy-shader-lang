@@ -1,4 +1,6 @@
 import ply.lex as lex
+import argparse
+import sys
 
 # 泛型状态
 states = (
@@ -217,18 +219,21 @@ def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
 
-if __name__ == '__main__':
 
-    # Build the lexer
+if __name__ == '__main__':
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+    args = arg_parser.parse_args()
+
     lexer = lex.lex()
 
-    # Test it out
-    data = '1 0.2 1'
+    with args.file as f:
+        program_str = f.read()
+        print(program_str)
+        print('=' * 60)
+        
+    lexer.input(program_str)
 
-    # Give the lexer some input
-    lexer.input(data)
-
-    # Tokenize
     while True:
         tok = lexer.token()
         if not tok:

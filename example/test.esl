@@ -1,0 +1,3 @@
+let a : i32 = 100;
+let b : f32 = 1.0f;
+const c : i64 = 100;

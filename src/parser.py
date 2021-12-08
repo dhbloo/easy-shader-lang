@@ -1,4 +1,6 @@
 import ply.yacc as yacc
+import argparse
+import sys
 from lexer import *
 
 
@@ -84,7 +86,7 @@ def p_typeSpec(p):
                  | array_type
                  | reference_type
                  | function_type'''
-    print('simple_type')
+    print('type_spec', p[1])
     # pass
 
 # simple_type
@@ -102,13 +104,13 @@ def p_simpleType(p):
                    | F16
                    | F32
                    | F64'''
-    print(p[1])
-    # pass
+    p[0] = f'simple_type({p[1]})'
+    print(f'simple type:', p[1])
 
 # complex_type
 def p_complexType(p):
     '''complex_type : ID'''
-    pass
+    p[0] = p[1]
 
 # array_type
 def p_arrayType(p):
@@ -488,15 +490,20 @@ def p_error(p):
     print("Syntax error in input!")
 
 
+
 lexer = lex.lex()
-# Build the parser
 parser = yacc.yacc(start='start')
 
-while True:
-    try:
-        s = input('calc > ')
-    except EOFError:
-        break
-    if not s: continue
-    result = parser.parse(s)
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+    args = arg_parser.parse_args()
+
+    with args.file as f:
+        program_str = f.read()
+        print(program_str)
+        print('=' * 60)
+        
+    result = parser.parse(program_str)
     print(result)
+        
