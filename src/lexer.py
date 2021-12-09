@@ -2,6 +2,33 @@ import ply.lex as lex
 import argparse
 import sys
 
+context = {
+    "struct" : [],
+    "interface" : [],
+    "generic_top" : [],
+    "generic_func" : [],
+    "last_name" : None,
+    "last_scope_is_function" : False,
+}
+
+def clear_context():
+    context["struct"].clear()
+    context["interface"].clear()
+    context["generic_top"].clear()
+    context["generic_func"].clear()
+
+def query_name(name):
+    last_name = name
+    if name in context["struct"]:
+        return 'STRUCTID'
+    elif name in context["interface"]:
+        return 'INTERFACEID'
+    elif name in context["generic_top"] or name in context["generic_func"]:
+        return 'GENERICID'
+    else:
+        return None
+
+
 # 泛型状态
 states = (
     ('generics', 'inclusive'),
@@ -9,8 +36,10 @@ states = (
 
 # token名list
 tokens = [
-    'GENERICS',         # 泛型
     'ID',               # 标识符
+    'STRUCTID',         # Struct 标识符
+    'INTERFACEID',      # Interface 标识符
+    'GENERICID',        # 泛型 标识符
     'INT',              # 10进制数字
     'HEXADECIMAL',      # 16进制数字
     'FLOAT',            # 32位浮点数
@@ -200,7 +229,8 @@ def t_ANY_STRING(t):
 # 标识符匹配规则
 def t_ANY_ID(t):
     r'[a-zA-Z_][a-zA-Z_0-9]*'
-    t.type = reserved.get(t.value, 'ID')  # Check for reserved words
+    # Check for reserved words & complex/generic type names
+    t.type = reserved.get(t.value) or query_name(t.value) or 'ID'
     return t
 
 
