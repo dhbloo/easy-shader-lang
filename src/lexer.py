@@ -7,8 +7,7 @@ context = {
     "interface" : [],
     "generic_top" : [],
     "generic_func" : [],
-    "last_name" : None,
-    "last_scope_is_function" : False,
+    "last_scope_is_top" : False,
 }
 
 def clear_context():
@@ -18,7 +17,6 @@ def clear_context():
     context["generic_func"].clear()
 
 def query_name(name):
-    last_name = name
     if name in context["struct"]:
         return 'STRUCTID'
     elif name in context["interface"]:

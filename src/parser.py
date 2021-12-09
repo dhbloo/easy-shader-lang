@@ -27,7 +27,6 @@ def p_block_decl(p):
                   | variable_decl SEMICOLON
                   | constant_decl SEMICOLON
                   | function_decl SEMICOLON'''
-    context["last_scope_is_function"] = False
     context["generic_func"].clear()
     pass
 
@@ -75,18 +74,13 @@ def p_type_spec_colon_opt(p):
 
 # function_decl
 def p_function_decl(p):
-    '''function_decl : FUNC enter_func ID function_sign '''
+    '''function_decl : FUNC ID function_sign '''
     p[0] = f'function_decl {p[2]}'
     pass
-
-def p_enter_func(p):
-    '''enter_func :'''
-    context["last_scope_is_function"] = True
 
 # function_def
 def p_function_def(p):
     '''function_def : function_decl block_statement'''
-    context["last_scope_is_function"] = False
     context["generic_func"].clear()
     p[0] = f'{p[1]} '
 
@@ -155,14 +149,15 @@ def p_function_type(p):
 
 # struct_decl
 def p_struct_decl(p):
-    '''struct_decl : STRUCT ID generics_type_list_opt complex_type_colon_opt LBRACE member_decl_nest RBRACE'''
+    '''struct_decl : STRUCT ID new_struct generics_type_list_opt complex_type_colon_opt LBRACE member_decl_nest RBRACE'''
     p[0] = f'struct {p[2]} {p[4]} {p[6]}'
     context["generic_top"].clear()
     # pass
 
 def p_new_struct(p):
     '''new_struct :'''
-    context["struct"].append(context["last_name"])
+    context["struct"].append(p[-1])
+    context["last_scope_is_top"] = True
 
 
 def p_complex_type_colon_opt(p):
@@ -175,20 +170,22 @@ def p_complex_type_colon_opt(p):
     
 # interface_decl
 def p_interface_decl(p):
-    '''interface_decl : INTERFACE ID new_interface generics_type_list_opt LBRACE interface_member_decl_nest RBRACE'''
+    '''interface_decl : INTERFACE ID new_interface generics_type_list_opt LBRACE  interface_member_decl_nest RBRACE'''
     p[0] = f'interface {p[2]} {p[3]} {p[5]}'
     context["generic_top"].clear()
     pass
 
 def p_new_interface(p):
     '''new_interface :'''
-    context["interface"].append(context["last_name"])
+    context["interface"].append(p[-1])
+    context["last_scope_is_top"] = True
 
 # generics_type_list_opt
 def p_generics_type_list_opt(p):
     '''generics_type_list_opt : generics_type_list
                               | empty'''
     p[0] = f'generics_type_list_opt {p[1]}'
+    context["last_scope_is_top"] = False
 
 
 # member_decl_nest
@@ -216,13 +213,11 @@ def p_type_function_def(p):
     '''type_function_def : type_function_decl block_statement'''
     pass
 
-
 # interface_member_decl
 def p_interface_member_decl(p):
     '''interface_member_decl : member_declarator
-                             | function_decl
-                             | type_function_decl'''
-    context["last_scope_is_function"] = False
+                             | function_decl SEMICOLON
+                             | type_function_decl SEMICOLON'''
     context["generic_func"].clear()
     p[0] = f'{p[1]}'
 
@@ -232,7 +227,7 @@ def p_type_function_decl(p):
 
 def p_member_declarator(p):
     '''member_declarator : ID COLON type_spec SEMICOLON'''
-    p[0] = f'member_declarator  {p[1]} '
+    p[0] = f'member_declarator {p[1]} '
     pass
 
 # function_sign
@@ -293,7 +288,7 @@ def p_generics_type_comma_nest(p):
 # generics_type
 def p_generics_type(p):
     '''generics_type : ID generics_type_range_colon_opt'''
-    context["generic_func" if context["last_scope_is_function"] else "generic_top"].append(p[1])
+    context["generic_top" if context["last_scope_is_top"] else "generic_func"].append(p[1])
     p[0] = f'{p[1]}  {p[2]}'
 
 # generics_type_range_comma_opt
