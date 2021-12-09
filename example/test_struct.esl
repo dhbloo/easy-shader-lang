@@ -1,30 +1,15 @@
-struct CentiMeter {
-    func Meter(self) {
-        return Meter(self.l / 100.0f);
-    }
-    l : f32;
+
+
+struct Sphere <i32> : Geometry {
+
+
 };
 
-let s = Sphere(vec3(1.0f, 2.0f, 3.0f), 1.0f);
-let s2 = (Sphere)s;
 
 
-struct <T> Meter {
-    l : i32;
-};
-
-struct <aaa, bbb> Sphere {
-    center : vec3;
-    radius : f32;
-    func Sphere(self, c, r) {
-        self.center = c;
-        self.radius = r;
+struct A <T> {
+    x : T;
+    func ff<U>(self, y : U) -> T {
+        return self.x + (T)y;
     }
-    func Sphere(self, s) {
-
-    }
-    func intersect(self, s : Sphere ref) -> bool {
-        return self.center - s.center;
-    }
-
-};
+}

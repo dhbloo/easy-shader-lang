@@ -87,6 +87,7 @@ def p_function_def(p):
 def p_type_spec(p):
     '''type_spec : simple_type
                  | complex_type
+                 | generic_type
                  | array_type
                  | reference_type
                  | function_type'''
@@ -114,7 +115,12 @@ def p_simple_type(p):
 
 # complex_type
 def p_complex_type(p):
-    '''complex_type : ID'''
+    '''complex_type : ID generics_specialization_list_opt'''
+    p[0] = p[1]
+
+# generic_type
+def p_generic_type(p):
+    '''generic_type : ID'''
     p[0] = p[1]
 
 # array_type
@@ -141,14 +147,21 @@ def p_function_type(p):
 
 # struct_decl
 def p_struct_decl(p):
-    '''struct_decl : STRUCT generics_type_list_opt ID LBRACE member_decl_nest RBRACE'''
-    p[0] = f'struct {p[2]} {p[3]} {p[5]}'
+    '''struct_decl : STRUCT ID generics_type_list_opt complex_type_colon_opt LBRACE member_decl_nest RBRACE'''
 
+    p[0] = f'struct {p[1]} {p[2]} {p[3]} {p[5]}'
     # pass
+
+def p_complex_type_colon_opt(p):
+    '''complex_type_colon_opt : COLON complex_type
+                              | empty'''
+    if (len(p) == 3):
+        p[0] = f'{p[1]} {p[2]}'
+    pass
 
 # interface_decl
 def p_interface_decl(p):
-    '''interface_decl : INTERFACE generics_type_list_opt ID LBRACE interface_member_decl_nest RBRACE'''
+    '''interface_decl : INTERFACE ID generics_type_list_opt LBRACE interface_member_decl_nest RBRACE'''
     p[0] = f'interface {p[2]} {p[3]} {p[5]}'
     pass
 
@@ -175,18 +188,29 @@ def p_interface_member_decl_nest(p):
 
 # member_decl
 def p_member_decl(p):
-    '''member_decl : member_declarator SEMICOLON
-                   | function_def'''
+    '''member_decl : member_declarator
+                   | function_def
+                   | type_function_def'''
     p[0] = f'{p[1]}'
+
+def p_type_function_def(p):
+    '''type_function_def : type_function_decl block_statement'''
+    pass
+
 
 # interface_member_decl
 def p_interface_member_decl(p):
     '''interface_member_decl : member_declarator
-                             | function_decl'''
+                             | function_decl
+                             | type_function_decl'''
     p[0] = f'{p[1]}'
 
+def p_type_function_decl(p):
+    '''type_function_decl : FUNC type_spec function_sign'''
+    pass
+
 def p_member_declarator(p):
-    '''member_declarator : ID type_spec_colon_opt'''
+    '''member_declarator : ID COLON type_spec SEMICOLON'''
     p[0] = f'member_declarator  {p[1]} '
     pass
 
@@ -235,7 +259,8 @@ def p_parameter_decl(p):
 # generics_type_list
 def p_generics_type_list(p):
     '''generics_type_list : LANGRBRACKET generics_type generics_type_comma_nest RANGRBRACKET'''
-    p[0] = f'< {p[2]}  {p[3]}>'
+    p[0] = f'<{p[2]} {p[3]}>'
+    pass
 
 # generics_type_comma_nest
 def p_generics_type_comma_nest(p):
@@ -408,7 +433,9 @@ def p_operand(p):
                | STRING
                | ID
                | LPAREN expression RPAREN'''
+    print('operand', p[1])
     p[0] = f'{p[1]}'
+
 
 def p_member_expr(p):
     '''member_expr : ID DOT ID'''
