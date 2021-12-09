@@ -9,8 +9,8 @@ start = 'start'  # 起始符号
 # 起始
 def p_expression_translationUnit(p):
     '''start : translation_unit'''
-    print('translation_unit')
-    # pass
+    # print('translation_unit')
+    pass
 
 
 # translation_unit A-> aA | bA | empty
@@ -18,35 +18,35 @@ def p_translationUnit_nest(p):
     '''translation_unit : block_decl translation_unit
                         | function_def translation_unit
                         | empty'''
-    print('block_decl', p[1])
-    # pass
+    # print('block_decl', p[1])
+    pass
 
 # block_declaration
-def p_blockDec(p):
+def p_block_decl(p):
     '''block_decl : type_decl SEMICOLON
                   | variable_decl SEMICOLON
                   | constant_decl SEMICOLON
                   | function_decl SEMICOLON'''
-    print('type_decl', p[1])
     pass
 
 # type_decl
-def p_typeDec(p):
+def p_type_decl(p):
     '''type_decl : type_alias_decl
                  | struct_decl
                  | interface_decl'''
-    print('type_alias_decl', p[1])
-    # pass
+    print('type_decl', p[1])
+    pass
 
 # type_alias_decl
-def p_typeAliasDecl(p):
+def p_type_alias_decl(p):
     '''type_alias_decl : TYPE ID ASSIGN type_spec'''
-    print('TYPE ID ASSIGN type_spec', p[2])
-    # pass
+    # print('TYPE ID ASSIGN type_spec', p[2])
+    pass
 
 # variable_decl
-def p_variableDecl(p):
+def p_variable_decl(p):
     '''variable_decl : LET declarator declarator_nest'''
+    print(f'variable_decl :let {p[2]}')
     pass
 
 # variable_decl nest
@@ -56,41 +56,46 @@ def p_declarator_nest(p):
     pass
 
 # constant_decl
-def p_constantDecl(p):
+def p_constant_decl(p):
     '''constant_decl : CONST declarator declarator_nest'''
+    pass
 
 # declarator
 def p_declarator(p):
     '''declarator : ID type_spec_colon_opt ASSIGN expression'''
+    p[0] = f'declarator {p[1]} = expression'
     pass
 
 # declarator_nest
-def p_typeSpecColon_opt(p):
+def p_type_spec_colon_opt(p):
     '''type_spec_colon_opt : COLON type_spec
                            | empty'''
 
 # function_decl
-def p_functioDecl(p):
-    '''function_decl : FUNC ID function_sign'''
+def p_functio_decl(p):
+    '''function_decl : FUNC ID function_sign '''
+    p[0] = f'function_decl {p[2]}'
     pass
 
 # function_def
-def p_functionDef(p):
+def p_function_def(p):
     '''function_def : function_decl block_statement'''
-    pass
+    p[0] = f'{p[1]} '
+
 
 # type_spec
-def p_typeSpec(p):
+def p_type_spec(p):
     '''type_spec : simple_type
                  | complex_type
                  | array_type
                  | reference_type
                  | function_type'''
     print('type_spec', p[1])
+    p[0] = p[1]
     # pass
 
 # simple_type
-def p_simpleType(p):
+def p_simple_type(p):
     '''simple_type : VOID
                    | BOOL
                    | I8
@@ -104,125 +109,157 @@ def p_simpleType(p):
                    | F16
                    | F32
                    | F64'''
-    p[0] = f'simple_type({p[1]})'
-    print(f'simple type:', p[1])
+    p[0] = f'({p[1]})'
+    # print(f'simple type:', p[1])
 
 # complex_type
-def p_complexType(p):
+def p_complex_type(p):
     '''complex_type : ID'''
     p[0] = p[1]
 
 # array_type
-def p_arrayType(p):
+def p_array_type(p):
     '''array_type : type_spec LBRACKET int_literal_opt RBRACKET'''
+    p[0] = f'{p[1]}[{p[3]}]'
     pass
 
-def p_intLiteral_opt(p):
+def p_int_literal_opt(p):
     '''int_literal_opt : INT
                        | empty'''
+    p[0] = p[1]
     pass
 
 # reference_type
-def p_referenceType(p):
+def p_reference_type(p):
     '''reference_type : type_spec REF'''
     pass
 
 # function_type
-def p_functionType(p):
+def p_function_type(p):
     '''function_type : function_sign'''
     pass
 
 # struct_decl
-def p_structDecl(p):
-    '''struct_decl : STRUCT generics_type_list_opt LBRACE member_decl_nest RBRACE'''
-    pass
+def p_struct_decl(p):
+    '''struct_decl : STRUCT generics_type_list_opt ID LBRACE member_decl_nest RBRACE'''
+    p[0] = f'struct {p[2]} {p[3]} {p[5]}'
+
+    # pass
 
 # interface_decl
-def p_interfaceDecl(p):
-    '''interface_decl : INTERFACE generics_type_list_opt LBRACE interface_member_decl_nest RBRACE'''
+def p_interface_decl(p):
+    '''interface_decl : INTERFACE generics_type_list_opt ID LBRACE interface_member_decl_nest RBRACE'''
+    p[0] = f'interface {p[2]} {p[3]} {p[5]}'
     pass
 
 # generics_type_list_opt
-def p_genericsTypeList_opt(p):
+def p_generics_type_list_opt(p):
     '''generics_type_list_opt : generics_type_list
                               | empty'''
+    p[0] = f'generics_type_list_opt {p[1]}'
+
 
 # member_decl_nest
 def p_member_decl_nest(p):
     '''member_decl_nest : member_decl member_decl_nest
                         | empty'''
+    if (len(p) == 3):
+        p[0] = f'{p[1]} {p[2]}'
 
 # member_decl_nest
 def p_interface_member_decl_nest(p):
-    '''interface_member_decl_nest : interface_member_decl interface_member_decl_nest
-                        | empty'''
+    '''interface_member_decl_nest : interface_member_decl SEMICOLON interface_member_decl_nest
+                                  | empty'''
+    if (len(p) == 3):
+        p[0] = f'{p[1]} {p[2]}'
 
 # member_decl
 def p_member_decl(p):
-    '''member_decl : declarator
+    '''member_decl : member_declarator SEMICOLON
                    | function_def'''
+    p[0] = f'{p[1]}'
 
 # interface_member_decl
 def p_interface_member_decl(p):
-    '''interface_member_decl : declarator
+    '''interface_member_decl : member_declarator
                              | function_decl'''
+    p[0] = f'{p[1]}'
+
+def p_member_declarator(p):
+    '''member_declarator : ID type_spec_colon_opt'''
+    p[0] = f'member_declarator  {p[1]} '
+    pass
 
 # function_sign
 def p_function_sign(p):
     '''function_sign : generics_type_list_opt LPAREN parameter_decl_list_opt RPAREN type_spec_assigntype_opt '''
+    p[0] = f'{p[3]}'
+    pass
 
-def p_p_parameterDeclList_opt(p):
-    '''parameter_decl_list_opt : parameter_dcel_list
+def p_parameter_decl_list_opt(p):
+    '''parameter_decl_list_opt : parameter_decl parameter_decl_comma_nest
                                | empty'''
+    if (len(p) == 3):
+        p[0] = f'parameter_decl_list_opt {p[1]} {p[2]}'
+    pass
 
-def p_typeSpecAssigntype_opt(p):
+def p_type_spec_assigntype_opt(p):
     '''type_spec_assigntype_opt : ASSIGNTYPE type_spec
                                 | empty'''
+    if (len(p) == 3):
+        p[0] = f'-> {p[2]}'
+    pass
 
-# parameter_decl_list
-def p_parameterDeclList(p):
-    '''parameter_dcel_list : parameter_decl parameter_decl_comma_nest'''
+# # parameter_decl_list
+# def p_parameter_decl_list(p):
+#     '''parameter_dcel_list : parameter_decl parameter_decl_comma_nest'''
+#     pass
 
 # parameter_decl_comma_opt
-def p_parameterDeclComma_opt(p):
+def p_parameter_decl_comma_opt(p):
     '''parameter_decl_comma_nest : COMMA parameter_decl parameter_decl_comma_nest
                                  | empty'''
+    if (len(p) == 4):
+        p[0] = f'{p[2]} {p[3]}'
     pass
 
 # parameter_decl
-def p_parameterDecl(p):
+def p_parameter_decl(p):
     '''parameter_decl : ID type_spec_colon_opt'''
+    p[0] = p[1]
     pass
 
 """
 泛型
 """
 # generics_type_list
-def p_genericsTypeList(p):
+def p_generics_type_list(p):
     '''generics_type_list : LANGRBRACKET generics_type generics_type_comma_nest RANGRBRACKET'''
-    pass
+    p[0] = f'< {p[2]}  {p[3]}>'
 
 # generics_type_comma_nest
-def p_genericsTypeComma_nest(p):
+def p_generics_type_comma_nest(p):
     '''generics_type_comma_nest : COMMA generics_type generics_type_comma_nest
                                 | empty'''
-    pass
+    if (len(p) == 4):
+        p[0] = f'{p[1]} {p[2]} {p[3]}'
 
 # generics_type
 def p_generics_type(p):
     '''generics_type : ID generics_type_range_colon_opt'''
-    pass
+    p[0] = f'{p[1]}  {p[2]}'
 
 # generics_type_range_comma_opt
-def p_genericsTypeRangeColon_opt(p):
+def p_generics_type_range_colon_opt(p):
     '''generics_type_range_colon_opt : COLON generics_type_range
                                      | empty'''
-    pass
+    if (len(p) == 3):
+        p[0] = f'{p[1]} {p[2]}'
 
 # generics_type_range
-def p_genericsTypeRange(p):
+def p_generics_type_range(p):
     '''generics_type_range : complex_type'''
-    pass
+    p[0] = f'{p[1]}'
 
 """
 6种语句
@@ -239,12 +276,13 @@ def p_statement(p):
     pass
 
 # decl_statement
-def p_declStatement(p):
+def p_decl_statement(p):
     '''decl_statement : variable_decl SEMICOLON
                       | constant_decl SEMICOLON'''
+    pass
 
 # block_statement
-def p_blockStatement(p):
+def p_block_statement(p):
     '''block_statement : LBRACE statement_nest RBRACE'''
     pass
 
@@ -256,44 +294,46 @@ def p_statement_nest(p):
 
 
 # expression_statement
-def p_expressionStatement(p):
+def p_expression_statement(p):
     '''expression_statement : expression_opt SEMICOLON'''
+    pass
 
-def p_expressionOpt(p):
+def p_expression_opt(p):
     '''expression_opt : expression
                       | empty'''
+    pass
 
 # if_statement
-def p_ifStatement(p):
+def p_if_statement(p):
     '''if_statement : IF LPAREN expression RPAREN statement statement_else_opt'''
     pass
 
-def p_statementElseOpt(p):
+def p_statement_else_opt(p):
     '''statement_else_opt : ELSE statement
                           | empty'''
     pass
 
 
 # iteration_statement
-def p_iterationStatement(p):
+def p_iteration_statement(p):
     '''iteration_statement : while_clause
                              | for_clause'''
     pass
 
-def p_whileClause(p):
+def p_while_clause(p):
     '''while_clause : WHILE LPAREN expression RPAREN statement'''
     pass
 
-def p_forClause(p):
+def p_for_clause(p):
     '''for_clause : FOR LPAREN for_init_statement expression_opt SEMICOLON expression RPAREN statement'''
     pass
 
-def p_forInitStatement(p):
+def p_forInit_statement(p):
     '''for_init_statement : expression_statement
                           | decl_statement'''
     pass
 
-def p_jumpStatement(p):
+def p_jump_statement(p):
     '''jump_statement : BREAK SEMICOLON
                       | CONTINUE SEMICOLON
                       | RETURN expression_opt SEMICOLON'''
@@ -307,51 +347,72 @@ def p_expression(p):
     '''expression : assign_expr
                   | binary_expr
                   | unary_expr'''
-    pass
+    print('expression', p[1])
 
-def p_assignExpr(p):
+def p_assign_expr(p):
     '''assign_expr : expression ASSIGN expression'''
     pass
 
-# + - * /
-def p_binaryExpr(p):
+# + - * / & == > >= < <= && || ! << >> != % | ^
+def p_binary_expr(p):
     '''binary_expr : expression PLUS expression
                    | expression MINUS expression
                    | expression MUL expression
-                   | expression DIV expression'''
-    pass
+                   | expression DIV expression
+                   | expression AND expression
+                   | expression OR expression
+                   | expression XOR expression
+                   | expression MOD expression
+                   | expression LSHIFT expression
+                   | expression RSHIFT expression
+                   | expression LOGICAL_OR expression
+                   | expression LOGICAL_AND expression
+                   | expression NOT_EQUAL expression
+                   | expression EQUAL expression
+                   | expression LESS_EQUAL expression
+                   | expression LESS expression
+                   | expression GREATER_EQUAL expression
+                   | expression GREATER expression'''
+    p[0] = f'{p[1]} {p[2]}'
+    print(p[0])
 
 # ++ --
-def p_unaryExpr(p):
+def p_unary_expr(p):
     '''unary_expr : unary_operation_opt primary_expr '''
-    pass
+    p[0] = f'{p[2]}'
 
 # 单目
-def p_unaryOpration_opt(p):
+def p_unary_opration_opt(p):
     '''unary_operation_opt : NOT
+                           | LOGICAL_NOT
+                           | PLUS %prec UPLUS
+                           | MINUS %prec UMINUS
                            | empty'''
     pass
 
-def p_primaryExpr(p):
+def p_primary_expr(p):
     '''primary_expr : operand
-                    | member_expr
+                    | call_expr
                     | index_expr
                     | cast_expr
                     | new_expr
-                    | call_expr'''
-    pass
+                    | member_expr
+                    | io_expr'''
+    p[0] = f'{p[1]}'
 
 def p_operand(p):
     '''operand : INT
+               | HEXADECIMAL
                | FLOAT
                | DOUBLE
+               | STRING
                | ID
                | LPAREN expression RPAREN'''
-    pass
+    p[0] = f'{p[1]}'
 
 def p_member_expr(p):
     '''member_expr : ID DOT ID'''
-    pass
+    p[0] = f'member_expr {p[1]} {p[3]}'
 
 def p_index_expr(p):
     '''index_expr : primary_expr LBRACKET expression RBRACKET'''
@@ -372,16 +433,17 @@ def p_parameter_list_opt(p):
 
 def p_call_expr(p):
     '''call_expr : primary_expr generics_specialization_list_opt LPAREN parameter_list_opt RPAREN'''
-    pass
+    p[0] = f'{p[1]}'
+
 
 def p_generics_specialization_list_opt(p):
-    '''generics_specialization_list_opt : generics_specialization_list
+    '''generics_specialization_list_opt : LANGRBRACKET type_spec type_spec_comma_nest RANGRBRACKET
                                         | empty'''
     pass
 
-def p_generics_specialization_list(p):
-    '''generics_specialization_list : LANGRBRACKET type_spec type_spec_comma_nest RANGRBRACKET'''
-    pass
+# def p_generics_specialization_list(p):
+#     '''generics_specialization_list : LANGRBRACKET type_spec type_spec_comma_nest RANGRBRACKET'''
+#     pass
 
 def p_type_spec_comma_nest(p):
     '''type_spec_comma_nest : COMMA type_spec type_spec_comma_nest
@@ -397,11 +459,32 @@ def p_expression_comma_nest(p):
                              | empty'''
     pass
 
+def p_io_expr(p):
+    '''io_expr : in_out LANGRBRACKET type_spec RANGRBRACKET LPAREN STRING RPAREN'''
+
+def p_in_out(p):
+    '''in_out : IN
+              | OUT'''
+
 # 空产生式
 def p_empty(p):
     'empty :'
     pass
 
+# 符号运算优先级
+precedence = (
+    ('left', 'LOGICAL_OR'),
+    ('left', 'LOGICAL_AND'),
+    ('left', 'OR'),
+    ('left', 'XOR'),
+    ('left', 'AND'),
+    ('left', 'EQUAL', 'NOT_EQUAL'),
+    ('left', 'LESS', 'LESS_EQUAL', 'GREATER', 'GREATER_EQUAL'),
+    ('left', 'LSHIFT', 'RSHIFT'),
+    ('left', 'PLUS', 'MINUS'),
+    ('left', 'MUL', 'DIV', 'MOD', ),
+    ('right', 'UMINUS', 'UPLUS', 'LOGICAL_NOT', 'NOT'),            # Unary minus operator
+)
 
 
 # def p_expression_translationUnit(p):
@@ -487,8 +570,7 @@ def p_empty(p):
 
 # Error rule for syntax errors
 def p_error(p):
-    print("Syntax error in input!")
-
+    print("Syntax error in input!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 
 lexer = lex.lex()

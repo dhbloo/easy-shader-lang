@@ -1,0 +1,16 @@
+interface  Geometry {
+    l : i32;
+    a : f32;
+    func getPosition1(self, i, a) -> vec3;
+    func getPosition2(self, i, a) -> vec3;
+    func getPosition3(self, i, a) -> vec3;
+};
+
+interface <aaa, bbb> Geometry {
+    l : i32;
+    a : f32;
+    func getPosition1(self, i, a) -> vec3;
+    func getPosition2(self, i, a) -> vec3;
+    func getPosition3(self, i, a) -> vec3;
+};
+
