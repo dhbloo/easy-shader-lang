@@ -220,7 +220,7 @@ def p_type_function_def(p):
 # interface_member_decl
 def p_interface_member_decl(p):
     '''interface_member_decl : member_declarator
-                             | function_decl'''
+                             | function_decl
                              | type_function_decl'''
     context["last_scope_is_function"] = False
     context["generic_func"].clear()
