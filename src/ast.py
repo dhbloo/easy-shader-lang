@@ -121,6 +121,23 @@ class ComplexType(TypeSpecifier):
         gslist = f' {self.generics_spec_list} ' if self.generics_spec_list else ' '
         return f'{type_class}{gslist}({self.identifier})'
 
+class AliasType(TypeSpecifier):
+    def __init__(self, loc, type : str) -> None:
+        super().__init__(loc)
+        self.type = type
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'AliasType({self.type})'
+
+class GenericType(TypeSpecifier):
+    def __init__(self, loc, type : str) -> None:
+        super().__init__(loc)
+        self.type = type
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'GenericType({self.type})'
+
+
 class ArrayType(TypeSpecifier):
     def __init__(self, loc, type : TypeSpecifier, size : Optional[int]) -> None:
         super().__init__(loc)
@@ -161,7 +178,7 @@ class FunctionDecl(BlockDeclaration):
         return f'{ind}Function Declaration:\n{ind+1}ID: {self.identifier}\n{self.func_sign.__str__(ind+1)}'
 
 class FunctionSignature(Node):
-    def __init__(self, loc, generics_type_list : List[GenericType] = [], parameter_decl_list : List[ParameterDecl] = [], return_type_spec : Optional[TypeSpecifier] = None) -> None:
+    def __init__(self, loc, generics_type_list : List[GenericsType] = [], parameter_decl_list : List[ParameterDecl] = [], return_type_spec : Optional[TypeSpecifier] = None) -> None:
         super().__init__(loc)
         self.generics_type_list = generics_type_list
         self.parameter_decl_list = parameter_decl_list
@@ -191,7 +208,7 @@ class ParameterDecl(Node):
 ## Sec4. Generic declaration
 ###########################################################
 
-class GenericType(Node):
+class GenericsType(Node):
     def __init__(self, loc, identifier, type_range : Optional[ComplexType] = None) -> None:
         super().__init__(loc)
         self.identifier = identifier
@@ -207,7 +224,7 @@ class GenericType(Node):
 ###########################################################
 
 class StructDecl(TypeDeclaration):
-    def __init__(self, loc, identifier : str, member_list : List[StructMember], generics_type_list : List[GenericType] = [], base_type : Optional[ComplexType] = None) -> None:
+    def __init__(self, loc, identifier : str, member_list : List[StructMember], generics_type_list : List[GenericsType] = [], base_type : Optional[ComplexType] = None) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.member_list = member_list
@@ -225,7 +242,7 @@ class StructDecl(TypeDeclaration):
         return out
 
 class InterfaceDecl(TypeDeclaration):
-    def __init__(self, loc, identifier : str, member_list : List[InterfaceMember], generics_type_list : List[GenericType] = []) -> None:
+    def __init__(self, loc, identifier : str, member_list : List[InterfaceMember], generics_type_list : List[GenericsType] = []) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.member_list = member_list
@@ -564,11 +581,11 @@ if __name__ == "__main__":
         "f",
         FunctionSignature(None,
             [
-                GenericType(None,
+                GenericsType(None,
                     "T",
                     type_range=None
                 ),
-                GenericType(None,
+                GenericsType(None,
                     "U",
                     type_range=ComplexType(None,
                         "IClassA",
