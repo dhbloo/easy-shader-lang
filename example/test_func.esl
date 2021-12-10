@@ -1,7 +1,7 @@
 func time() -> f32;
 func max(a : i32, b : i32) -> i32;
 
-func max(a : i32, b : i32) {
+func max1(a : i32, b : i32) {
     if (b > a)
         return b;
     else
