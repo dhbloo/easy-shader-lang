@@ -494,6 +494,14 @@ class IndexExpression(PrimaryExpression):
     def __str__(self, ind=Indent()) -> str:
         return f'{ind}Index Expression:\n{ind+1}Array Expr:\n{self.array_expr.__str__(ind+2)}{ind+1}Member ID:\n{self.index_expr.__str__(ind+2)}\n'
 
+class RefExpression(PrimaryExpression):
+    def __init__(self, loc, ref_expr : Expression) -> None:
+        super().__init__(loc)
+        self.ref_expr = ref_expr
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Ref Expression:\n{self.ref_expr.__str__(ind+1)}\n'
+
 class CastExpression(PrimaryExpression):
     def __init__(self, loc, type_spec : TypeSpecifier, cast_expr : Expression) -> None:
         super().__init__(loc)
