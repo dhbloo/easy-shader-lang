@@ -5,30 +5,27 @@ import logging
 from termcolor import colored
 
 from lexer import *
-from ast import *
+import ast
 
-from src.ast import TranslationUnit
-
+# from src.ast import TranslationUnit
 
 start = 'start'  # 起始符号
 
 # 起始
 def p_expression_translationUnit(p):
     '''start : translation_unit'''
-    # print('translation_unit')
-    pass
-
+    p[0] = p[1]
 
 # translation_unit A-> aA | bA | empty
 def p_translationUnit_nest(p):
     '''translation_unit : block_decl translation_unit
                         | function_def translation_unit
                         | empty'''
-    if p[1] == 'empty':
-        p[0] = TranslationUnit(p.lineno(1), [])
-    else:
+    if p[1]:
         p[0] = p[2]
         p[0].declaration_list.append(p[1])
+    else:
+        p[0] = ast.TranslationUnit(p.lineno(1), [])
 
 def p_block_decl(p):
     '''block_decl : type_decl SEMICOLON
@@ -36,55 +33,55 @@ def p_block_decl(p):
                   | constant_decl SEMICOLON
                   | function_decl SEMICOLON'''
     context["generic_func"].clear()
-    print(p[1])
+    p[0] = p[1]
 
 def p_type_decl(p):
     '''type_decl : type_alias_decl
                  | struct_decl
                  | interface_decl'''
-    p[0] = f'type_decl {p[1]}'
-    # print('type_decl', p[1])
-    # pass
+    p[0] = p[1]
 
 def p_type_alias_decl(p):
     '''type_alias_decl : TYPE ID ASSIGN type_spec'''
     context["type_alias"].append(p[2])
-    # print('TYPE ID ASSIGN type_spec', p[2])
-    pass
+    p[0] = ast.TypeAliasDecl(p.lineno(1), p[2], p[3])
 
 def p_variable_decl(p):
     '''variable_decl : LET declarator declarator_nest'''
-    # print(f'variable_decl :let {p[2]}')
-    p[0] = f'variable_decl {p[2]}'
-    print(p[0])
+    p[0] = ast.VariableDecl(p.lineno(1), [p[2]] + p[3], False)
 
 def p_declarator_nest(p):
     '''declarator_nest : COMMA declarator declarator_nest
                        | empty'''
-    pass
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
 
 def p_constant_decl(p):
     '''constant_decl : CONST declarator declarator_nest'''
-    pass
+    p[0] = ast.VariableDecl(p.lineno(1), [p[2]] + p[3], True)
 
 def p_declarator(p):
     '''declarator : ID type_spec_colon_opt ASSIGN expression'''
-    p[0] = f'declarator {p[1]} = expression'
+    p[0] = ast.Declarator(p.lineno(1), p[1], p[2], p[4])
 
 def p_type_spec_colon_opt(p):
     '''type_spec_colon_opt : COLON type_spec
                            | empty'''
+    if p[1]:
+        p[0] = p[2]
+    else:
+        p[0] = None
 
 def p_function_decl(p):
     '''function_decl : FUNC ID function_sign '''
-    p[0] = f'function_decl {p[2]}'
-    pass
+    p[0] = ast.FunctionDecl(p.lineno(1), p[2], p[3])
 
 def p_function_def(p):
     '''function_def : function_decl block_statement'''
     context["generic_func"].clear()
-    p[0] = f'{p[1]}'
-    print('function_def', p[1])
+    p[0] = ast.FunctionDefinition(p.lineno(1), p[1], p[2])
 
 def p_type_spec(p):
     '''type_spec : simple_type
@@ -94,9 +91,7 @@ def p_type_spec(p):
                  | array_type
                  | reference_type
                  | function_type'''
-    # print('type_spec', p[1])
-    p[0] = f'{p[1]}'
-    # pass
+    p[0] = p[1]
 
 def p_simple_type(p):
     '''simple_type : VOID
@@ -112,46 +107,45 @@ def p_simple_type(p):
                    | F16
                    | F32
                    | F64'''
-    p[0] = f'({p[1]})'
-    # print(f'simple type:', p[1])
-
+    p[0] = ast.simpleType(p.lineno(1), p[1])
 
 def p_complex_type(p):
     '''complex_type : INTERFACEID generics_specialization_list_opt
                     | STRUCTID generics_specialization_list_opt'''
-    p[0] = f'{p[1]}'
+    p[0] = ast.ComplexType(p.lineno(1), p[1], p[2])
 
 def p_generic_type(p):
     '''generic_type : GENERICID'''
-    p[0] = f'{p[1]}'
+    p[0] = ast.GenericType(p.lineno(1), p[1]) ##############################疑问
 
 def p_alias_type(p):
     '''alias_type : TYPEALIASID'''
-    p[0] = f'{p[1]}'
+    p[0] = ast.TypeAliasDecl(p.lineno(1), p[1])
 
 def p_array_type(p):
     '''array_type : type_spec LBRACKET int_literal_opt RBRACKET'''
-    p[0] = f'{p[1]}[{p[3]}]'
+    p[0] = ast.ArrayType(p.lineno(1), p[1], p[3])  ####################### 如果没有opt，size为-1？
 
 def p_int_literal_opt(p):
     '''int_literal_opt : INT
                        | empty'''
-    p[0] = p[1]
-    pass
+    if p[1]:
+        p[0] = p[1]
+    else:
+        p[0] = -1
 
 def p_reference_type(p):
     '''reference_type : type_spec REF'''
-    pass
+    p[0] = ast.ReferenceType(p.lineno(1), p[1])
 
 def p_function_type(p):
     '''function_type : function_sign'''
-    pass
+    p[0] = ast.FunctionType(p.lineno(1), p[1])
 
 def p_struct_decl(p):
     '''struct_decl : STRUCT ID new_struct generics_type_list_opt complex_type_colon_opt LBRACE member_decl_nest RBRACE'''
-    p[0] = f'struct {p[2]} {p[4]} {p[6]}'
     context["generic_top"].clear()
-    # pass
+    p[0] = ast.StructDecl(p.lineno(1), p[2], p[7], p[4], p[5])
 
 def p_new_struct(p):
     '''new_struct :'''
@@ -162,16 +156,15 @@ def p_new_struct(p):
 def p_complex_type_colon_opt(p):
     '''complex_type_colon_opt : COLON complex_type
                               | empty'''
-    if (len(p) == 3):
-        p[0] = f'{p[1]} {p[2]}'
-    pass
-    
+    if p[1]:
+        p[0] = p[2]
+    else:
+        p[0] = None
     
 def p_interface_decl(p):
     '''interface_decl : INTERFACE ID new_interface generics_type_list_opt LBRACE  interface_member_decl_nest RBRACE'''
-    p[0] = f'interface {p[2]} {p[3]} {p[5]}'
+    p[0] = ast.InterfaceDecl(p.lineno(1), p[2], p[6], p[4])
     context["generic_top"].clear()
-    pass
 
 def p_new_interface(p):
     '''new_interface :'''
@@ -491,7 +484,7 @@ def p_in_out(p):
 # 空产生式
 def p_empty(p):
     'empty :'
-    p[0] = 'empty'
+    p[0] = None
 
 # 符号运算优先级
 precedence = (
