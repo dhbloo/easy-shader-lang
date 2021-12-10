@@ -12,6 +12,9 @@ class Indent():
     def __str__(self) -> str:
         return '  ' * self.ind
 
+    def __add__(self, i) -> Indent:
+        return Indent(self.ind + i)
+
 class Node():
     """Base class of AST node"""
     def __init__(self, loc) -> None:
@@ -30,12 +33,15 @@ class Node():
 ###########################################################
 
 class TranslationUnit(Node):
-    def __init__(self, loc, decl_list) -> None:
+    def __init__(self, loc, decl_list : List[BlockDeclaration | FunctionDecl]) -> None:
         super().__init__(loc)
         self.declaration_list = decl_list
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}'
+        out = 'Translation Unit:\n'
+        for decl in self.declaration_list:
+            out += decl.__str__(ind+1)
+        return out
 
 class BlockDeclaration(Node):
     pass
@@ -49,13 +55,20 @@ class TypeAliasDecl(TypeDeclaration):
         self.identifier = identifier
         self.type_spec = type_spec
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Type Alias:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n'
+
 class Declarator(Node):
-    def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier] = None, initializer=None) -> None:
+    def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier], init_expr : Expression) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.type_spec = type_spec
-        self.initializer = initializer
+        self.init_expr = init_expr
         self.is_const = False
+
+    def __str__(self, ind=Indent()) -> str:
+        const = '(const)' if self.is_const else ' '
+        return f'{ind}Declarator: {const}\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n{ind+1}Initializer:\n{self.init_expr.__str__(ind+2)}'
 
 class VariableDecl(BlockDeclaration):
     def __init__(self, loc, declarator_list : List[Declarator], is_const : bool) -> None:
@@ -64,6 +77,12 @@ class VariableDecl(BlockDeclaration):
         if is_const:
             for decl in self.declarator_list:
                 decl.is_const = True
+
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Variable Declarations:\n'
+        for decl in self.declarator_list:
+            out += decl.__str__(ind+1)
+        return out
 
 class FunctionDefinition(Node):
     def __init__(self, loc, func_decl : FunctionDecl, block_stmt : BlockStatement) -> None:
@@ -85,7 +104,7 @@ class SimpleType(TypeSpecifier):
         self.type = type
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{self.type}'
+        return f'{self.type.name}'
 
 class ComplexType(TypeSpecifier):
     def __init__(self, loc, identifier : str, is_interface : bool, generics_spec_list : List[TypeSpecifier] = []) -> None:
@@ -122,7 +141,7 @@ class FunctionType(TypeSpecifier):
         self.func_sign = func_sign
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{self.func_sign}'
+        return self.func_sign.__str__(ind)
 
 
 ###########################################################
@@ -135,6 +154,9 @@ class FunctionDecl(BlockDeclaration):
         self.identifier = identifier
         self.func_sign = func_sign
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Function Declaration:\n{ind+1}ID: {self.identifier}\n{self.func_sign.__str__(ind+1)}'
+
 class FunctionSignature(Node):
     def __init__(self, loc, generics_type_list : List[GenericType] = [], parameter_decl_list : List[ParameterDecl] = [], return_type_spec : Optional[TypeSpecifier] = None) -> None:
         super().__init__(loc)
@@ -142,11 +164,24 @@ class FunctionSignature(Node):
         self.parameter_decl_list = parameter_decl_list
         self.return_type_spec = return_type_spec
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Function Signature:\n{ind+1}Generic Types:\n'
+        for generic_type in self.generics_type_list:
+            out += generic_type.__str__(ind+2)
+        out += f'{ind+1}Parameters:\n'
+        for parameter in self.parameter_decl_list:
+            out += parameter.__str__(ind+2)
+        out += f'{ind+1}Return Type: {self.return_type_spec or "(Empty)"}\n'
+        return out
+
 class ParameterDecl(Node):
     def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier] = None) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.type_spec = type_spec
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Parameter Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec or "(Empty)"}\n'
 
 
 ###########################################################
@@ -154,10 +189,14 @@ class ParameterDecl(Node):
 ###########################################################
 
 class GenericType(Node):
-    def __init__(self, loc, identifier, type_range : Optional[TypeSpecifier] = None) -> None:
+    def __init__(self, loc, identifier, type_range : Optional[ComplexType] = None) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.type_range = type_range
+
+    def __str__(self, ind=Indent()) -> str:
+        type_str = f': {self.type_range}' if self.type_range else ''
+        return f'{ind}Generic Name: {self.identifier} {type_str}\n'
 
 
 ###########################################################
@@ -172,12 +211,31 @@ class StructDecl(TypeDeclaration):
         self.generics_type_list = generics_type_list
         self.base_type = base_type
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Struct Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Generic Types:\n'
+        for generic_type in self.generics_type_list:
+            out += generic_type.__str__(ind+2)
+        out += f'{ind+1}Base Type: {self.base_type or "(Empty)"}\n'
+        out += f'{ind+1}Members:\n'
+        for member in self.member_list:
+            out += member.__str__(ind+2)
+        return out
+
 class InterfaceDecl(TypeDeclaration):
     def __init__(self, loc, identifier : str, member_list : List[InterfaceMember], generics_type_list : List[GenericType] = []) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.member_list = member_list
         self.generics_type_list = generics_type_list
+
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Interface Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Generic Types:\n'
+        for generic_type in self.generics_type_list:
+            out += generic_type.__str__(ind+2)
+        out += f'{ind+1}Members:\n'
+        for member in self.member_list:
+            out += member.__str__(ind+2)
+        return out
 
 class StructMember(Node):
     pass
@@ -191,15 +249,24 @@ class MemberDecl(StructMember):
         self.identifier = identifier
         self.type_spec = type_spec
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Declarator:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n'
+
 class MemberFuncDecl(InterfaceMember):
     def __init__(self, loc, func_decl : FunctionDecl) -> None:
         super().__init__(loc)
         self.func_decl = func_decl
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Function Declaration:\n{self.func_decl.__str__(ind+1)}'
+
 class MemberFuncDefinition(StructMember):
     def __init__(self, loc, func_definition : FunctionDefinition) -> None:
         super().__init__(loc)
         self.func_definition = func_definition
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Function Definition:\n{self.func_definition.__str__(ind+1)}'
 
 class MemberTypeFuncDecl(InterfaceMember):
     def __init__(self, loc, type_spec : TypeSpecifier, func_sign : FunctionSignature) -> None:
@@ -207,11 +274,17 @@ class MemberTypeFuncDecl(InterfaceMember):
         self.type_spec = type_spec
         self.func_sign = func_sign
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Type Function Declaration:\n{ind+1}Type: {self.type_spec}\n{self.func_sign.__str__(ind+1)}'
+
 class MemberTypeFuncDefinition(StructMember):
     def __init__(self, loc, type_func_decl : MemberTypeFuncDecl, block_stmt : BlockStatement) -> None:
         super().__init__(loc)
         self.type_func_decl = type_func_decl
         self.block_stmt = block_stmt
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Type Function Definition:\n{self.type_func_decl.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
 
 ###########################################################
 ## Sec6. Statement
@@ -225,15 +298,27 @@ class DeclarationStatement(Statement):
         super().__init__(loc)
         self.declaration = declaration
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Declaration Statement:\n{self.declaration.__str__(ind+1)}'
+
 class BlockStatement(Statement):
     def __init__(self, loc, statement_list : List[Statement]) -> None:
         super().__init__(loc)
         self.statement_list = statement_list
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Block Statement:\n'
+        for stmt in self.statement_list:
+            out += stmt.__str__(ind+1)
+        return out
+
 class ExpressionStatement(Statement):
     def __init__(self, loc, expression : Expression) -> None:
         super().__init__(loc)
         self.expression = expression
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Expression Statement:\n{self.expression.__str__(ind+1)}'
 
 class IfStatement(Statement):
     def __init__(self, loc, condition : Expression, true_stmt : Statement, false_stmt : Optional[Statement] = None) -> None:
@@ -242,11 +327,25 @@ class IfStatement(Statement):
         self.true_stmt = true_stmt
         self.false_stmt = false_stmt
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}If Statement:\n'
+        out += f'{ind+1}Condition:\n{self.condition.__str__(ind+2)}'
+        out += f'{ind+1}True Statement:\n{self.true_stmt.__str__(ind+2)}'
+        if self.false_stmt:
+            out += f'{ind+1}False Statement:\n{self.false_stmt.__str__(ind+2)}'
+        return out
+
 class WhileStatement(Statement):
-    def __init__(self, loc, condition : Expression, loop_stmt : Statement) -> None:
+    def __init__(self, loc, cond_expr : Expression, loop_stmt : Statement) -> None:
         super().__init__(loc)
-        self.condition = condition
+        self.cond_expr = cond_expr
         self.loop_stmt = loop_stmt
+
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}While Statement:\n'
+        out += f'{ind+1}Condition:\n{self.cond_expr.__str__(ind+2)}'
+        out += f'{ind+1}Loop Statement:\n{self.loop_stmt.__str__(ind+2)}'
+        return out
 
 class ForStatement(Statement):
     def __init__(self, loc, init_stmt : Statement, cond_expr : Optional[Expression], iter_expr : Optional[Expression], loop_stmt : Expression) -> None:
@@ -256,6 +355,16 @@ class ForStatement(Statement):
         self.iter_expr = iter_expr
         self.loop_stmt = loop_stmt
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}For Statement:\n'
+        out += f'{ind+1}Init Statement:\n{self.init_stmt.__str__(ind+2)}'
+        if self.cond_expr:
+            out += f'{ind+1}Condition:\n{self.cond_expr.__str__(ind+2)}'
+        if self.iter_expr:
+            out += f'{ind+1}Iteration:\n{self.iter_expr.__str__(ind+2)}'
+        out += f'{ind+1}Loop Statement:\n{self.loop_stmt.__str__(ind+2)}'
+        return out
+
 class JumpStatement(Statement):
     pass
 
@@ -263,14 +372,23 @@ class BreakStatement(Statement):
     def __init__(self, loc) -> None:
         super().__init__(loc)
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Break Statement\n'
+
 class ContinueStatement(Statement):
     def __init__(self, loc) -> None:
         super().__init__(loc)
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Continue Statement\n'
 
 class ReturnStatement(Statement):
     def __init__(self, loc, expression : Optional[Expression]) -> None:
         super().__init__(loc)
         self.expression = expression
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Return Statement\n{self.expression.__str__(ind+1) if self.expression else ""}'
 
 
 ###########################################################
@@ -309,6 +427,9 @@ class LiteralOperand(Operand):
     def __init__(self, loc, literal) -> None:
         super().__init__(loc)
         self.literal = literal
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Literal: ({type(self.literal)}) {self.literal}\n'
 
 class IdentifierOperand(Operand):
     def __init__(self, loc, identifier : str) -> None:
@@ -366,4 +487,58 @@ class LambdaExpression(PrimaryExpression):
 
 
 if __name__ == "__main__":
-    print(SimpleType(None, BasicType.BOOL))
+    t = ReferenceType(None,
+        ArrayType(None, 
+            SimpleType(None, BasicType.I32),
+            size=4
+        )
+    )
+    alias = TypeAliasDecl(None,
+        "vec4",
+        type_spec=t
+    )
+    var_decl = VariableDecl(None,
+        [
+            Declarator(None,
+                "a",
+                type_spec=t,
+                init_expr=LiteralOperand(None, 1)
+            ),
+            Declarator(None,
+                "b",
+                type_spec=SimpleType(None, BasicType.F32),
+                init_expr=LiteralOperand(None, 1.0)
+            ),
+        ],
+        is_const=True
+    )
+    func_decl = FunctionDecl(None,
+        "f",
+        FunctionSignature(None,
+            [
+                GenericType(None,
+                    "T",
+                    type_range=None
+                ),
+                GenericType(None,
+                    "U",
+                    type_range=ComplexType(None,
+                        "IClassA",
+                        is_interface=True
+                    )
+                ),
+            ],
+            [
+                ParameterDecl(None,
+                    "arg1",
+                    type_spec=SimpleType(None, BasicType.F32),
+                ),
+                ParameterDecl(None,
+                    "arg2",
+                    type_spec=None,
+                )
+            ],
+            SimpleType(None, BasicType.F32)
+        )
+    )
+    print(func_decl)
