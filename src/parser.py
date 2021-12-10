@@ -3,6 +3,8 @@ import argparse
 import sys
 from lexer import *
 
+from termcolor import colored
+
 
 start = 'start'  # 起始符号
 
@@ -93,7 +95,7 @@ def p_type_spec(p):
                  | array_type
                  | reference_type
                  | function_type'''
-    print('type_spec', p[1])
+    # print('type_spec', p[1])
     p[0] = p[1]
     # pass
 
@@ -117,12 +119,13 @@ def p_simple_type(p):
 
 # complex_type
 def p_complex_type(p):
-    '''complex_type : ID generics_specialization_list_opt'''
+    '''complex_type : INTERFACEID generics_specialization_list_opt
+                    | STRUCTID generics_specialization_list_opt'''
     p[0] = p[1]
 
 # generic_type
 def p_generic_type(p):
-    '''generic_type : ID'''
+    '''generic_type : GENERICID'''
     p[0] = p[1]
 
 # array_type
@@ -389,7 +392,8 @@ def p_expression(p):
     '''expression : assign_expr
                   | binary_expr
                   | unary_expr'''
-    print('expression', p[1])
+    # print('expression', p[1])
+    pass
 
 def p_assign_expr(p):
     '''assign_expr : expression ASSIGN expression'''
@@ -450,7 +454,7 @@ def p_operand(p):
                | STRING
                | ID
                | LPAREN expression RPAREN'''
-    print('operand', p[1])
+    # print('operand', p[1])
     p[0] = f'{p[1]}'
 
 
@@ -492,6 +496,7 @@ def p_generics_specialization_list_opt(p):
 def p_type_spec_comma_nest(p):
     '''type_spec_comma_nest : COMMA type_spec type_spec_comma_nest
                             | empty'''
+
     pass
 
 def p_parameter_list(p):
@@ -614,7 +619,9 @@ precedence = (
 
 # Error rule for syntax errors
 def p_error(p):
-    print("Syntax error in input!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(colored("Syntax error in input!", color='red'), "Traceback", p)
+
+
 
 
 lexer = lex.lex()
@@ -630,6 +637,6 @@ if __name__ == "__main__":
         print(program_str)
         print('=' * 60)
         
-    result = parser.parse(program_str)
+    result = parser.parse(program_str, tracking=True)
     print(result)
         

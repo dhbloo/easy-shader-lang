@@ -11,12 +11,13 @@ context = {
 }
 
 def clear_context():
-    context["struct"].clear()
-    context["interface"].clear()
-    context["generic_top"].clear()
-    context["generic_func"].clear()
+    context["struct"].clear()  # strcut名
+    context["interface"].clear()  # interface名
+    context["generic_top"].clear()  # struct和interface的泛型名
+    context["generic_func"].clear()  # function泛型名
 
 def query_name(name):
+    #return None
     if name in context["struct"]:
         return 'STRUCTID'
     elif name in context["interface"]:
@@ -228,6 +229,7 @@ def t_ANY_STRING(t):
 def t_ANY_ID(t):
     r'[a-zA-Z_][a-zA-Z_0-9]*'
     # Check for reserved words & complex/generic type names
+    # print(t.value)
     t.type = reserved.get(t.value) or query_name(t.value) or 'ID'
     return t
 

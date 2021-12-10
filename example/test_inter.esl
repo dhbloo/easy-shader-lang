@@ -6,7 +6,7 @@ interface Geometry {
     func getPosition3(self, i, a) -> vec3;
 };
 
-interface Geometry <aaa, bbb> {
+interface Geometry <U, T> {
     l : i32;
     a : f32;
     func getPosition1(self, i, a) -> vec3;

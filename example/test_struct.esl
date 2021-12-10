@@ -1,15 +1,16 @@
+interface Geometry{
 
+};
 
-struct Sphere <i32> : Geometry {
-
+struct Sphere<T> : Geometry {
 
 };
 
 
 
-struct A <T> {
-    x : T;
-    func ff<U>(self, y : U) -> T {
-        return self.x + (T)y;
+struct A <Q> {
+    x : Q;
+    func ff<U>(self, y : U) -> Q {
+        return self.x + (Q)y;
     }
-}
+};
