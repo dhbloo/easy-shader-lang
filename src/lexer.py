@@ -5,6 +5,7 @@ import sys
 context = {
     "struct" : [],
     "interface" : [],
+    "type_alias" : [],
     "generic_top" : [],
     "generic_func" : [],
     "last_scope_is_top" : False,
@@ -13,8 +14,10 @@ context = {
 def clear_context():
     context["struct"].clear()  # strcut名
     context["interface"].clear()  # interface名
+    context["type_alias"].clear()  # interface名
     context["generic_top"].clear()  # struct和interface的泛型名
     context["generic_func"].clear()  # function泛型名
+    context["last_scope_is_top"] = False
 
 def query_name(name):
     #return None
@@ -22,6 +25,8 @@ def query_name(name):
         return 'STRUCTID'
     elif name in context["interface"]:
         return 'INTERFACEID'
+    elif name in context["type_alias"]:
+        return 'TYPEALIASID'
     elif name in context["generic_top"] or name in context["generic_func"]:
         return 'GENERICID'
     else:
@@ -38,6 +43,7 @@ tokens = [
     'ID',               # 标识符
     'STRUCTID',         # Struct 标识符
     'INTERFACEID',      # Interface 标识符
+    'TYPEALIASID',      # TypeAlias 标识符
     'GENERICID',        # 泛型 标识符
     'INT',              # 10进制数字
     'HEXADECIMAL',      # 16进制数字
@@ -262,6 +268,7 @@ if __name__ == '__main__':
         print(program_str)
         print('=' * 60)
         
+    clear_context()
     lexer.input(program_str)
 
     while True:

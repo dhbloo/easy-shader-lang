@@ -20,9 +20,6 @@ let c = A(1);
 
 
 
-
-
-
 type vec3 = f32[3];
 let v = vec3(1.0f, 2.0f, 3.0f);
 

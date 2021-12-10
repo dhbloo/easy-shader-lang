@@ -41,6 +41,7 @@ def p_type_decl(p):
 
 def p_type_alias_decl(p):
     '''type_alias_decl : TYPE ID ASSIGN type_spec'''
+    context["type_alias"].append(p[2])
     # print('TYPE ID ASSIGN type_spec', p[2])
     pass
 
@@ -83,6 +84,7 @@ def p_type_spec(p):
     '''type_spec : simple_type
                  | complex_type
                  | generic_type
+                 | alias_type
                  | array_type
                  | reference_type
                  | function_type'''
@@ -115,6 +117,10 @@ def p_complex_type(p):
 
 def p_generic_type(p):
     '''generic_type : GENERICID'''
+    p[0] = f'{p[1]}'
+
+def p_alias_type(p):
+    '''alias_type : TYPEALIASID'''
     p[0] = f'{p[1]}'
 
 def p_array_type(p):
@@ -592,6 +598,7 @@ if __name__ == "__main__":
         print(program_str)
         print('=' * 60)
         
+    clear_context()
     result = parser.parse(program_str, tracking=True)
     print(result)
         
