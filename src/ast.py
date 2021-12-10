@@ -90,6 +90,9 @@ class FunctionDefinition(Node):
         self.func_decl = func_decl
         self.block_stmt = block_stmt
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Function Definition:\n{self.func_decl.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
+
 
 ###########################################################
 ## Sec2. Type specifier
@@ -446,12 +449,15 @@ class IdentifierOperand(Operand):
         self.identifier = identifier
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Unary Expression:\n{ind+1}UnaryOp: {self.operator.name}\n{self.expression.__str__(ind+1)}'
+        return f'{ind}Identifier: {self.identifier}\n'
 
 class ExpressionOperand(Operand):
     def __init__(self, loc, expression : Expression) -> None:
         super().__init__(loc)
         self.expression = expression
+
+    def __str__(self, ind=Indent()) -> str:
+        return self.expression.__str__(ind)
 
 class MemberExpression(PrimaryExpression):
     def __init__(self, loc, object_expr : PrimaryExpression, member_id : str) -> None:
@@ -459,11 +465,17 @@ class MemberExpression(PrimaryExpression):
         self.object_expr = object_expr
         self.member_id = member_id
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Member Expression:\n{ind+1}Object Expr:\n{self.object_expr.__str__(ind+2)}{ind+1}Member ID: {self.member_id}\n'
+
 class IndexExpression(PrimaryExpression):
     def __init__(self, loc, array_expr : PrimaryExpression, index_expr : Expression) -> None:
         super().__init__(loc)
         self.array_expr = array_expr
         self.index_expr = index_expr
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Index Expression:\n{ind+1}Array Expr:\n{self.array_expr.__str__(ind+2)}{ind+1}Member ID:\n{self.index_expr.__str__(ind+2)}\n'
 
 class CastExpression(PrimaryExpression):
     def __init__(self, loc, type_spec : TypeSpecifier, cast_expr : Expression) -> None:
@@ -471,11 +483,20 @@ class CastExpression(PrimaryExpression):
         self.type_spec = type_spec
         self.cast_expr = cast_expr
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Cast Expression:\n{ind+1}Type: {self.type_spec}\n{ind+1}Member ID:\n{self.cast_expr.__str__(ind+2)}\n'
+
 class NewExpression(PrimaryExpression):
     def __init__(self, loc, type_spec : TypeSpecifier, param_list : List[Expression] = []) -> None:
         super().__init__(loc)
         self.type_spec = type_spec
         self.param_list = param_list
+
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}New Expression:\n{ind+1}Type: {self.type_spec}\n{ind+1}Parameters:\n'
+        for param in self.param_list:
+            out += param.__str__(ind+2)
+        return out
 
 class CallExpression(PrimaryExpression):
     def __init__(self, loc, func_expr : PrimaryExpression, generics_spec_list : List[TypeSpecifier] = [], param_list : List[Expression] = []) -> None:
@@ -484,6 +505,15 @@ class CallExpression(PrimaryExpression):
         self.generics_spec_list = generics_spec_list
         self.param_list = param_list
 
+    def __str__(self, ind=Indent()) -> str:
+        out = f'{ind}Call Expression:\n'
+        out += f'{ind+1}Function:\n{self.func_expr.__str__(ind+2)}'
+        out += f'{ind+1}Generics: {self.generics_spec_list or "(Empty)"}\n'
+        out += f'{ind+1}Parameters:\n'
+        for param in self.param_list:
+            out += param.__str__(ind+2)
+        return out
+
 class IOExpression(PrimaryExpression):
     def __init__(self, loc, io_type : IOType, type_spec : TypeSpecifier, name : str) -> None:
         super().__init__(loc)
@@ -491,11 +521,17 @@ class IOExpression(PrimaryExpression):
         self.type_spec = type_spec
         self.name = name
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}IO Expression: ({self.io_type.name})\n{ind+1}Type: {self.type_spec}\n{ind+1}Name: {self.name}\n'
+
 class LambdaExpression(PrimaryExpression):
     def __init__(self, loc, func_sign : FunctionSignature, block_stmt : BlockStatement) -> None:
         super().__init__(loc)
         self.func_sign = func_sign
         self.block_stmt = block_stmt
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Lambda Expression:\n{self.func_sign.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
 
 
 if __name__ == "__main__":
