@@ -33,7 +33,7 @@ class Node():
 ###########################################################
 
 class TranslationUnit(Node):
-    def __init__(self, loc, decl_list : List[BlockDeclaration | FunctionDecl]) -> None:
+    def __init__(self, loc, decl_list : List[BlockDeclaration | FunctionDecl] = []) -> None:
         super().__init__(loc)
         self.declaration_list = decl_list
 
@@ -404,6 +404,9 @@ class AssignExpression(Expression):
         self.lhs_expr = lhs_expr
         self.rhs_expr = rhs_expr
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Assign Expression:\n{self.lhs_expr.__str__(ind+1)}{self.rhs_expr.__str__(ind+1)}'
+
 class BinaryExpression(Expression):
     def __init__(self, loc, lhs_expr : Expression, rhs_expr : Expression, operator : BinaryOp) -> None:
         super().__init__(loc)
@@ -411,11 +414,17 @@ class BinaryExpression(Expression):
         self.rhs_expr = rhs_expr
         self.operator = operator
 
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Binary Expression:\n{ind+1}BinaryOp: {self.operator.name}\n{self.lhs_expr.__str__(ind+1)}{self.rhs_expr.__str__(ind+1)}'
+
 class UnaryExpression(Expression):
     def __init__(self, loc, expression : Expression, operator : UnaryOp) -> None:
         super().__init__(loc)
         self.expression = expression
         self.operator = operator
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Unary Expression:\n{ind+1}UnaryOp: {self.operator.name}\n{self.expression.__str__(ind+1)}'
 
 class PrimaryExpression(Expression):
     pass
@@ -435,6 +444,9 @@ class IdentifierOperand(Operand):
     def __init__(self, loc, identifier : str) -> None:
         super().__init__(loc)
         self.identifier = identifier
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Unary Expression:\n{ind+1}UnaryOp: {self.operator.name}\n{self.expression.__str__(ind+1)}'
 
 class ExpressionOperand(Operand):
     def __init__(self, loc, expression : Expression) -> None:

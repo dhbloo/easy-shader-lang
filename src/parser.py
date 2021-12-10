@@ -1,9 +1,13 @@
 import ply.yacc as yacc
 import argparse
 import sys
-from lexer import *
 import logging
 from termcolor import colored
+
+from lexer import *
+from ast import *
+
+from src.ast import TranslationUnit
 
 
 start = 'start'  # 起始符号
@@ -20,8 +24,11 @@ def p_translationUnit_nest(p):
     '''translation_unit : block_decl translation_unit
                         | function_def translation_unit
                         | empty'''
-    # print('block_decl', p[1])
-    pass
+    if p[1] == 'empty':
+        p[0] = TranslationUnit(p.lineno(1), [])
+    else:
+        p[0] = p[2]
+        p[0].declaration_list.append(p[1])
 
 def p_block_decl(p):
     '''block_decl : type_decl SEMICOLON
@@ -484,7 +491,7 @@ def p_in_out(p):
 # 空产生式
 def p_empty(p):
     'empty :'
-    pass
+    p[0] = 'empty'
 
 # 符号运算优先级
 precedence = (
