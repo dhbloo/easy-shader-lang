@@ -14,3 +14,11 @@ struct A <Q> {
         return self.x + (Q)y;
     }
 };
+
+
+struct F {
+    a : i32;
+    func call(x : A<i32>, y:A<i32>) {
+        return x + y;
+    }
+};

@@ -2,7 +2,7 @@ import ply.yacc as yacc
 import argparse
 import sys
 from lexer import *
-
+import logging
 from termcolor import colored
 
 
@@ -49,7 +49,7 @@ def p_variable_decl(p):
     '''variable_decl : LET declarator declarator_nest'''
     # print(f'variable_decl :let {p[2]}')
     p[0] = f'variable_decl {p[2]}'
-    pass
+    print(p[0])
 
 def p_declarator_nest(p):
     '''declarator_nest : COMMA declarator declarator_nest
@@ -63,7 +63,6 @@ def p_constant_decl(p):
 def p_declarator(p):
     '''declarator : ID type_spec_colon_opt ASSIGN expression'''
     p[0] = f'declarator {p[1]} = expression'
-    pass
 
 def p_type_spec_colon_opt(p):
     '''type_spec_colon_opt : COLON type_spec
@@ -251,7 +250,7 @@ def p_parameter_decl(p):
 泛型
 """
 def p_generics_type_list(p):
-    '''generics_type_list : LANGRBRACKET generics_type generics_type_comma_nest RANGRBRACKET'''
+    '''generics_type_list : LESS generics_type generics_type_comma_nest GREATER'''
     p[0] = f'<{p[2]} {p[3]}>'
     pass
 
@@ -287,6 +286,7 @@ def p_statement(p):
                  | if_statement
                  | iteration_statement
                  | jump_statement'''
+
     pass
 
 def p_decl_statement(p):
@@ -315,7 +315,8 @@ def p_expression_opt(p):
 
 def p_if_statement(p):
     '''if_statement : IF LPAREN expression RPAREN statement statement_else_opt'''
-    pass
+    p[0] = f'if {p[3]}'
+    print(p[0])
 
 def p_statement_else_opt(p):
     '''statement_else_opt : ELSE statement
@@ -354,12 +355,12 @@ def p_expression(p):
     '''expression : assign_expr
                   | binary_expr
                   | unary_expr'''
+    p[0] = f'expression {p[1]}'
     print('expression', p[1])
-    pass
 
 def p_assign_expr(p):
     '''assign_expr : expression ASSIGN expression'''
-    pass
+    p[0] = f'assign_expr {p[1]} {p[3]}'
 
 # + - * / & == > >= < <= && || ! << >> != % | ^
 def p_binary_expr(p):
@@ -381,13 +382,13 @@ def p_binary_expr(p):
                    | expression LESS expression
                    | expression GREATER_EQUAL expression
                    | expression GREATER expression'''
-    p[0] = f'{p[1]} {p[2]}'
+    p[0] = f'binary_expr {p[1]} {p[2]} {p[3]}'
     # print(p[0])
 
 # ++ --
 def p_unary_expr(p):
     '''unary_expr : unary_operation_opt primary_expr '''
-    p[0] = f'{p[2]}'
+    p[0] = f'unary_expr {p[2]}'
     print('primary_expr', p[2])
 
 # 单目
@@ -406,6 +407,7 @@ def p_primary_expr(p):
                     | cast_expr
                     | new_expr
                     | member_expr
+                    | lambda_expr
                     | io_expr'''
     p[0] = f'{p[1]}'
 
@@ -422,7 +424,7 @@ def p_operand(p):
 
 
 def p_member_expr(p):
-    '''member_expr : ID DOT ID'''
+    '''member_expr : primary_expr DOT ID'''
     p[0] = f'member_expr {p[1]} {p[3]}'
 
 def p_index_expr(p):
@@ -445,12 +447,12 @@ def p_parameter_list_opt(p):
 
 def p_call_expr(p):
     '''call_expr : primary_expr LPAREN parameter_list_opt RPAREN
-                 | primary_expr LANGRBRACKET type_spec type_spec_comma_nest RANGRBRACKET LPAREN parameter_list_opt RPAREN'''
+                 | primary_expr GENERICMARK LESS type_spec type_spec_comma_nest GREATER LPAREN parameter_list_opt RPAREN'''
     p[0] = f'call_expr {p[1]}'
 
 
 def p_generics_specialization_list_opt(p):
-    '''generics_specialization_list_opt : LANGRBRACKET type_spec type_spec_comma_nest RANGRBRACKET
+    '''generics_specialization_list_opt : LESS type_spec type_spec_comma_nest GREATER
                                         | empty'''
     pass
 
@@ -469,8 +471,11 @@ def p_expression_comma_nest(p):
                              | empty'''
     pass
 
+def p_lambda_expr(p):
+    '''lambda_expr : FUNC function_sign block_statement'''
+
 def p_io_expr(p):
-    '''io_expr : in_out LANGRBRACKET type_spec RANGRBRACKET LPAREN STRING RPAREN'''
+    '''io_expr : in_out LESS type_spec GREATER LPAREN STRING RPAREN'''
 
 def p_in_out(p):
     '''in_out : IN
@@ -496,97 +501,20 @@ precedence = (
     ('right', 'UMINUS', 'UPLUS', 'LOGICAL_NOT', 'NOT'),            # Unary minus operator
 )
 
-
-# def p_expression_translationUnit(p):
-#     '''start : translation_unit'''
-#     pass
-#
-# # translation_unit A-> aA | bA | empty
-# def p_translationUnit_nest(p):
-#     '''translation_unit : block_decl translation_unit
-#                         | function_def translation_unit
-#                         | empty'''
-#     pass
-
-# def p_expression_term(p):
-#     '''start : A'''
-#     print('start : A', p[1])
-#
-# # 嵌套 重复0次到多次
-# def p_A(p):
-#     '''A : INT A
-#          | DOUBLE A
-#          | empty'''
-#     if (p[1] == None):
-#         print('empty')
-#     else:
-#         print('p_A', p[1])
-#
-# # 可选opt
-# def p_B(p):
-#     '''B : INT B_opt INT'''
-#     print('B', p[1], p[3])
-#
-# def p_B_opt(p):
-#     '''B_opt : DOUBLE
-#              | empty'''
-#     print('B_opt', p[1])
-
-# def p_expression_term(p):
-#     '''start : ID SEMICOLON
-#              | factor SEMICOLON'''
-#     p[0] = p[1]
-
-# def p_term_factor(p):
-#     'term : factor'
-#     p[0] = p[1]
-#
-# def p_factor_expr(p):
-#     'factor : LPAREN start RPAREN'
-#     p[0] = p[2]
-#
-#
-# def p_expression_plus(p):
-#     'start : start PLUS term'
-#     p[0] = p[1] + p[3]
-#
-# def p_expression_minus(p):
-#     'start : start MINUS term'
-#     p[0] = p[1] - p[3]
-#
-# def p_term_mul(p):
-#     'term : term MUL factor'
-#     p[0] = p[1] * p[3]
-#
-# def p_term_div(p):
-#     'term : term DIV factor'
-#     p[0] = p[1] / p[3]
-#
-# # 整型变量
-# def p_factor_num(p):
-#     'factor : INT'
-#     p[0] = p[1]
-
-# 32位浮点变量
-# def p_factor_float(p):
-#     'factor : FLOAT'
-#     p[0] = p[1]
-#
-# # 64位浮点变量
-# def p_factor_double(p):
-#     'factor : DOUBLE'
-#     p[0] = p[1]
-
-
 # Error rule for syntax errors
 def p_error(p):
     print(colored("Syntax error in input!", color='red'), "Traceback", p)
 
 
-
-
+logging.basicConfig(
+    level = logging.DEBUG,
+    filename = "parselog.txt",
+    filemode = "w",
+    format = "%(filename)10s:%(lineno)4d:%(message)s"
+)
+log = logging.getLogger()
 lexer = lex.lex()
-parser = yacc.yacc(start='start')
+parser = yacc.yacc(start='start', debug=log)
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
@@ -601,4 +529,3 @@ if __name__ == "__main__":
     clear_context()
     result = parser.parse(program_str, tracking=True)
     print(result)
-        

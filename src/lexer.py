@@ -34,9 +34,9 @@ def query_name(name):
 
 
 # 泛型状态
-states = (
-    ('generics', 'inclusive'),
-)
+# states = (
+#     ('generics', 'inclusive'),
+# )
 
 # token名list
 tokens = [
@@ -76,14 +76,15 @@ tokens = [
     'RPAREN',           # )
     'LBRACKET',         # [
     'RBRACKET',         # ]
-    'LANGRBRACKET',     # <
-    'RANGRBRACKET',     # >
+    # 'LANGRBRACKET',     # <
+    # 'RANGRBRACKET',     # >
     'LBRACE',           # {
     'RBRACE',           # }
     'COMMA',            # ,
     'COLON',            # :
     'DOT',              # .
     'SEMICOLON',        # ;
+    'GENERICMARK',      # '
 ]
 
 # 保留字
@@ -156,47 +157,49 @@ t_ANY_COMMA     = r','
 t_COLON         = r':'
 t_DOT           = r'\.'
 t_SEMICOLON     = r';'
+t_GENERICMARK   = r'\''
 
 
 
 # 匹配到泛型类型声明的第一个<，进入泛型状态
-def t_generics(t):
-    r'\<'
-    t.lexer.code_start = t.lexer.lexpos  # Record the starting position
-    t.lexer.level = 1  # Initial brace level
-    t.lexer.begin('generics')  # Enter 'generics' state
-    t.type = 'LANGRBRACKET'
-    t.value = '<'
-    return t
-
-# 泛型状态规则
-def t_generics_LANGRBRACKET(t):
-    r'\<'
-    t.lexer.level += 1
-    return t
-
-
-def t_generics_RANGRBRACKET(t):
-    r'\>'
-    t.lexer.level -= 1
-
-    # If closing brace, return the code fragment
-    if t.lexer.level == 0:
-        # t.value = t.lexer.lexdata[t.lexer.code_start-1:t.lexer.lexpos]
-        # t.type = "GENERICS"
-        t.lexer.lineno += t.value.count('\n')
-        t.lexer.begin('INITIAL')
-    return t
-
-
-
-# 忽略空格
-t_generics_ignore = " \t\n"
+# def t_generics(t):
+#     r'\<'
+#     # t.lexer.code_start = t.lexer.lexpos  # Record the starting position
+#     t.lexer.level = 1  # Initial brace level
+#     t.lexer.begin('generics')  # Enter 'generics' state
+#     t.type = 'LESS'
+#     t.value = '<'
+#     print(t.type)
+#     return t
+#
+# # 泛型状态规则
+# def t_generics_LANGRBRACKET(t):
+#     r'\<'
+#     t.lexer.level += 1
+#     return t
+#
+#
+# def t_generics_RANGRBRACKET(t):
+#     r'\>'
+#     t.lexer.level -= 1
+#
+#     # If closing brace, return the code fragment
+#     if t.lexer.level == 0:
+#         # t.value = t.lexer.lexdata[t.lexer.code_start-1:t.lexer.lexpos]
+#         # t.type = "GENERICS"
+#         t.lexer.lineno += t.value.count('\n')
+#         t.lexer.begin('INITIAL')
+#     return t
 
 
-# 错误跳过
-def t_generics_error(t):
-    t.lexer.skip(1)
+
+# # 忽略空格
+# t_generics_ignore = " \t\n"
+#
+#
+# # 错误跳过
+# def t_generics_error(t):
+#     t.lexer.skip(1)
 
 
 # b不同精度浮点数匹配规则

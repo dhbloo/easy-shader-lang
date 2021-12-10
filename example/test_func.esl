@@ -16,6 +16,7 @@ func rand() -> f32 {
 
 func max<T>(array: T[] ref) -> T;
 func max<T, U>(array: T[] ref) -> U;
+let a = max '<i32, i64>();
 
 func max_element<T>(v: T[] ref) -> T {
     return v;
@@ -30,11 +31,3 @@ func normalize<U>(v : U) -> U {
 }
 
 let arr : i32[4] = i32[4](1,2,3,4);
-
-
-
-
-
-
-
-

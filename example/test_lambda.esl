@@ -1,0 +1,4 @@
+let z = func(x) { return x*x; };
+let w : func(_: i32) -> i32 = z;
+
+func test_lambda(func )
