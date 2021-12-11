@@ -1,7 +1,6 @@
 from __future__ import annotations 
 from typing import List, Optional
 
-from codegen import CodegenContext
 from enums import BasicType, BinaryOp, UnaryOp, IOType
 
 class Indent():
@@ -24,8 +23,8 @@ class Node():
     def __str__(self, ind=Indent()) -> str:
         raise NotImplementedError()
     
-    def codegen(self, ctx : CodegenContext):
-        raise NotImplementedError("Codegen not implemented")
+    def accept(self, visitor) -> None:
+        visitor.visit(self)
 
 
 ###########################################################
