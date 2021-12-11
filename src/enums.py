@@ -23,8 +23,8 @@ class UnaryOp(Enum):
     LOGICAL_NOT = 3
 
 class BinaryOp(Enum):
-    ADD = 0
-    SUB = 1
+    PLUS = 0
+    MINUS = 1
     MUL = 2
     DIV = 3
     MOD = 4

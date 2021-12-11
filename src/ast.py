@@ -333,7 +333,7 @@ class BlockStatement(Statement):
         return out
 
 class ExpressionStatement(Statement):
-    def __init__(self, loc, expression : Expression) -> None:
+    def __init__(self, loc, expression : Expression) -> None:#############################Optional[Expression])
         super().__init__(loc)
         self.expression = expression
 
@@ -438,7 +438,7 @@ class BinaryExpression(Expression):
         return f'{ind}Binary Expression:\n{ind+1}BinaryOp: {self.operator.name}\n{self.lhs_expr.__str__(ind+1)}{self.rhs_expr.__str__(ind+1)}'
 
 class UnaryExpression(Expression):
-    def __init__(self, loc, expression : Expression, operator : UnaryOp) -> None:
+    def __init__(self, loc, expression : Expression, operator : UnaryOp) -> None:  ##########无操作符
         super().__init__(loc)
         self.expression = expression
         self.operator = operator
