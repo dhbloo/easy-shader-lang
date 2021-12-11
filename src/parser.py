@@ -6,6 +6,7 @@ from termcolor import colored
 
 from lexer import *
 import ast
+from enums import BasicType, BinaryOp, UnaryOp, IOType
 
 # from src.ast import TranslationUnit
 
@@ -107,7 +108,7 @@ def p_simple_type(p):
                    | F16
                    | F32
                    | F64'''
-    p[0] = ast.simpleType(p.lineno(1), p[1])
+    p[0] = ast.SimpleType(p.lineno(1), BasicType[p.slice[1].type])
 
 def p_complex_type(p):
     '''complex_type : INTERFACEID generics_specialization_list_opt
@@ -120,7 +121,7 @@ def p_generic_type(p):
 
 def p_alias_type(p):
     '''alias_type : TYPEALIASID'''
-    p[0] = ast.TypeAliasDecl(p.lineno(1), p[1])
+    p[0] = ast.AliasType(p.lineno(1), p[1])
 
 def p_array_type(p):
     '''array_type : type_spec LBRACKET int_literal_opt RBRACKET'''
@@ -132,7 +133,7 @@ def p_int_literal_opt(p):
     if p[1]:
         p[0] = p[1]
     else:
-        p[0] = -1
+        p[0] = None
 
 def p_reference_type(p):
     '''reference_type : type_spec REF'''
@@ -163,8 +164,8 @@ def p_complex_type_colon_opt(p):
     
 def p_interface_decl(p):
     '''interface_decl : INTERFACE ID new_interface generics_type_list_opt LBRACE  interface_member_decl_nest RBRACE'''
-    p[0] = ast.InterfaceDecl(p.lineno(1), p[2], p[6], p[4])
     context["generic_top"].clear()
+    p[0] = ast.InterfaceDecl(p.lineno(1), p[2], p[6], p[4])
 
 def p_new_interface(p):
     '''new_interface :'''
@@ -174,106 +175,123 @@ def p_new_interface(p):
 def p_generics_type_list_opt(p):
     '''generics_type_list_opt : generics_type_list
                               | empty'''
-    p[0] = f'generics_type_list_opt {p[1]}'
     context["last_scope_is_top"] = False
-
+    if p[1]:
+        p[0] = p[1]
+    else:
+        p[0] = []
 
 def p_member_decl_nest(p):
     '''member_decl_nest : member_decl member_decl_nest
                         | empty'''
-    if (len(p) == 3):
-        p[0] = f'{p[1]} {p[2]}'
+    if p[1]:
+        p[0] = [p[1]] + p[2]
+    else:
+        p[0] = []
+
 
 def p_interface_member_decl_nest(p):
     '''interface_member_decl_nest : interface_member_decl interface_member_decl_nest
                                   | empty'''
-    if (len(p) == 3):
-        p[0] = f'{p[1]} {p[2]}'
+    if p[1]:
+        p[0] = [p[1]] + p[2]
+    else:
+        p[0] = []
 
 def p_member_decl(p):
     '''member_decl : member_declarator
                    | function_def
                    | type_function_def'''
-    p[0] = f'{p[1]}'
+    p[0] = p[1]
 
 def p_type_function_def(p):
     '''type_function_def : type_function_decl block_statement'''
-    pass
+    p[0] = ast.MemberTypeFuncDefinition(p.lineno(1), p[1], p[2])
 
 def p_interface_member_decl(p):
     '''interface_member_decl : function_decl SEMICOLON
                              | type_function_decl SEMICOLON'''
     context["generic_func"].clear()
-    p[0] = f'{p[1]}'
+    if isinstance(p[1], ast.FunctionDecl):
+        p[0] = ast.MemberFuncDecl(p.lineno(2), p[1])
+    else:
+        p[0] = p[1]
+
 
 def p_type_function_decl(p):
     '''type_function_decl : FUNC type_spec function_sign'''
-    pass
+    p[0] = ast.MemberTypeFuncDecl(p.lineno(1), p[2], p[3])
 
 def p_member_declarator(p):
     '''member_declarator : ID COLON type_spec SEMICOLON'''
-    p[0] = f'member_declarator {p[1]} '
-    pass
+    p[0] = ast.MemberDecl(p.lineno(1), p[1], p[3])
 
 def p_function_sign(p):
-    '''function_sign : generics_type_list_opt LPAREN parameter_decl_list_opt RPAREN type_spec_assigntype_opt '''
-    p[0] = f'{p[3]}'
-    pass
+    '''function_sign : generics_type_list_opt LPAREN parameter_decl_list_opt RPAREN type_spec_assigntype_opt'''
+    p[0] = ast.FunctionSignature(p.lineno(2), p[1], p[3], p[5])
+
 
 def p_parameter_decl_list_opt(p):
     '''parameter_decl_list_opt : parameter_decl parameter_decl_comma_nest
                                | empty'''
-    if (len(p) == 3):
-        p[0] = f'parameter_decl_list_opt {p[1]} {p[2]}'
-    pass
+    if p[1]:
+        p[0] = [p[1]] + p[2]
+    else:
+        p[0] = []
 
 def p_type_spec_assigntype_opt(p):
     '''type_spec_assigntype_opt : ASSIGNTYPE type_spec
                                 | empty'''
-    if (len(p) == 3):
-        p[0] = f'-> {p[2]}'
-    pass
+    if p[1]:
+        p[0] = p[2]
+    else:
+        p[0] = None
 
 def p_parameter_decl_comma_opt(p):
     '''parameter_decl_comma_nest : COMMA parameter_decl parameter_decl_comma_nest
                                  | empty'''
-    if (len(p) == 4):
-        p[0] = f'{p[2]} {p[3]}'
-    pass
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
 
 def p_parameter_decl(p):
     '''parameter_decl : ID type_spec_colon_opt'''
-    p[0] = p[1]
-    pass
+    p[0] = ast.ParameterDecl(p.lineno(1), p[1], p[2])
 
 """
 泛型
 """
 def p_generics_type_list(p):
     '''generics_type_list : LESS generics_type generics_type_comma_nest GREATER'''
-    p[0] = f'<{p[2]} {p[3]}>'
-    pass
+    p[0] = [p[2]] + p[3]
 
 def p_generics_type_comma_nest(p):
     '''generics_type_comma_nest : COMMA generics_type generics_type_comma_nest
                                 | empty'''
-    if (len(p) == 4):
-        p[0] = f'{p[1]} {p[2]} {p[3]}'
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
+
 
 def p_generics_type(p):
     '''generics_type : ID generics_type_range_colon_opt'''
     context["generic_top" if context["last_scope_is_top"] else "generic_func"].append(p[1])
-    p[0] = f'{p[1]}  {p[2]}'
+    p[0] = ast.GenericsType(p.lineno(1), p[1], p[2])
 
 def p_generics_type_range_colon_opt(p):
     '''generics_type_range_colon_opt : COLON generics_type_range
                                      | empty'''
-    if (len(p) == 3):
-        p[0] = f'{p[1]} {p[2]}'
+    if p[1]:
+        p[0] = p[2]
+    else:
+        p[0] = None
+
 
 def p_generics_type_range(p):
     '''generics_type_range : complex_type'''
-    p[0] = f'{p[1]}'
+    p[0] = p[1]
 
 """
 6种语句
@@ -286,67 +304,78 @@ def p_statement(p):
                  | if_statement
                  | iteration_statement
                  | jump_statement'''
-
-    pass
+    p[0] = p[1]
 
 def p_decl_statement(p):
     '''decl_statement : variable_decl SEMICOLON
                       | constant_decl SEMICOLON'''
-    pass
+    p[0] = ast.DeclarationStatement(p.lineno(1), p[1])
 
 def p_block_statement(p):
     '''block_statement : LBRACE statement_nest RBRACE'''
-    pass
+    p[0] = ast.BlockStatement(p.lineno(1), p[2])
 
 def p_statement_nest(p):
     '''statement_nest : statement statement_nest
                       | empty'''
-    pass
-
+    if p[1]:
+        p[0] = [p[1]] + p[2]
+    else:
+        p[0] = []
 
 def p_expression_statement(p):
     '''expression_statement : expression_opt SEMICOLON'''
-    pass
+    p[0] = ast.ExpressionStatement(p.lineno(1), p[1])
 
 def p_expression_opt(p):
     '''expression_opt : expression
-                      | empty'''
-    pass
+                      | empty'''  ###################################空的如何处理？
+    if p[1]:
+        p[0] = p[1]
+    else:
+        p[0] = None
 
 def p_if_statement(p):
     '''if_statement : IF LPAREN expression RPAREN statement statement_else_opt'''
-    p[0] = f'if {p[3]}'
-    print(p[0])
+    p[0] = ast.IfStatement(p.lineno(1), p[3], p[5], p[6])
 
 def p_statement_else_opt(p):
     '''statement_else_opt : ELSE statement
                           | empty'''
-    pass
+    if p[1]:
+        p[0] = p[2]
+    else:
+        p[0] = None
 
 def p_iteration_statement(p):
     '''iteration_statement : while_clause
                              | for_clause'''
-    pass
+    p[0] = p[1]
 
 def p_while_clause(p):
     '''while_clause : WHILE LPAREN expression RPAREN statement'''
-    pass
+    p[0] = ast.WhileStatement(p.lineno(1), p[3], p[5])
 
 def p_for_clause(p):
     '''for_clause : FOR LPAREN for_init_statement expression_opt SEMICOLON expression RPAREN statement'''
-    pass
+    p[0] = ast.ForStatement(p.lineno(1), p[3], p[4], p[6], p[8])
 
 def p_forInit_statement(p):
     '''for_init_statement : expression_statement
                           | decl_statement'''
-    pass
+    p[0] = p[1]
 
 def p_jump_statement(p):
     '''jump_statement : BREAK SEMICOLON
                       | CONTINUE SEMICOLON
                       | RETURN expression_opt SEMICOLON'''
-    pass
 
+    if p[1] == 'break':
+        p[0] = ast.BreakStatement(p.lineno(1))
+    elif p[1] == 'continue':
+        p[0] = ast.ContinueStatement(p.lineno(1))
+    elif p[1] == 'return':
+        p[0] = ast.ReturnStatement(p.lineno(1), p[2])
 """
 表达式
 """
@@ -354,13 +383,14 @@ def p_jump_statement(p):
 def p_expression(p):
     '''expression : assign_expr
                   | binary_expr
-                  | unary_expr'''
-    p[0] = f'expression {p[1]}'
-    print('expression', p[1])
+                  | unary_expr
+                  | primary_expr'''
+    p[0] = p[1]
 
 def p_assign_expr(p):
     '''assign_expr : expression ASSIGN expression'''
-    p[0] = f'assign_expr {p[1]} {p[3]}'
+    p[0] = ast.AssignExpression(p.lineno(1), p[1], p[3])
+
 
 # + - * / & == > >= < <= && || ! << >> != % | ^
 def p_binary_expr(p):
@@ -382,34 +412,33 @@ def p_binary_expr(p):
                    | expression LESS expression
                    | expression GREATER_EQUAL expression
                    | expression GREATER expression'''
-    p[0] = f'binary_expr {p[1]} {p[2]} {p[3]}'
-    # print(p[0])
+    p[0] = ast.BinaryExpression(p.lineno(1), p[1], p[3], BinaryOp[p.slice[2].type])
 
 # ++ --
 def p_unary_expr(p):
-    '''unary_expr : unary_operation_opt primary_expr '''
-    p[0] = f'unary_expr {p[2]}'
-    print('primary_expr', p[2])
+    '''unary_expr : unary_operation primary_expr '''
+    p[0] = ast.UnaryExpression(p.lineno(1), p[2], p[1])
 
 # 单目
 def p_unary_opration_opt(p):
-    '''unary_operation_opt : NOT
+    '''unary_operation : NOT
                            | LOGICAL_NOT
                            | PLUS %prec UPLUS
-                           | MINUS %prec UMINUS
-                           | empty'''
-    pass
+                           | MINUS %prec UMINUS'''
+    if p[1]:
+        p[0] = p[1]
 
 def p_primary_expr(p):
     '''primary_expr : operand
                     | call_expr
                     | index_expr
+                    | ref_expr
                     | cast_expr
                     | new_expr
                     | member_expr
                     | lambda_expr
                     | io_expr'''
-    p[0] = f'{p[1]}'
+    p[0] = p[1]
 
 def p_operand(p):
     '''operand : INT
@@ -420,66 +449,91 @@ def p_operand(p):
                | ID
                | LPAREN expression RPAREN'''
     # print('operand', p[1])
-    p[0] = f'operand {p[1]}'
-
+    # print(p.lineno(1), p.slice[1].type)
+    if len(p) == '(':
+        p[0] = ast.ExpressionOperand(p.lineno(1), p[2])
+    elif p.slice[1].type == 'ID':
+        p[0] = ast.IdentifierOperand(p.lineno(1), p[1])
+    else:
+        p[0] = ast.LiteralOperand(p.lineno(1), p[1])
 
 def p_member_expr(p):
     '''member_expr : primary_expr DOT ID'''
-    p[0] = f'member_expr {p[1]} {p[3]}'
+    p[0] = ast.MemberExpression(p.lineno(1), p[1], p[3])
 
 def p_index_expr(p):
     '''index_expr : primary_expr LBRACKET expression RBRACKET'''
-    p[0] = f'index_expr {p[1]} {p[3]}'
+    p[0] = ast.IndexExpression(p.lineno(2), p[1], p[3])
+
+def p_ref_expr(p):
+    '''ref_expr : REF LPAREN expression RPAREN'''
+    p[0] = ast.RefExpression(p.lineno(2), p[3])
 
 def p_cast_expr(p):
     '''cast_expr : LPAREN type_spec RPAREN expression'''
-    pass
+    p[0] = ast.CastExpression(p.lineno(1), p[2], p[4])
 
 def p_new_expr(p):
     '''new_expr : type_spec LPAREN parameter_list_opt RPAREN'''
-    p[0] = f'new_expr {p[1]}'
-    print(f'new_expr {p[1]}')
+    p[0] = ast.NewExpression(p.lineno(2), p[1], p[3])
 
 def p_parameter_list_opt(p):
     '''parameter_list_opt : parameter_list
                           | empty'''
-    pass
+    if p[1]:
+        p[0] = p[1]
+    else:
+        p[0] = []
 
 def p_call_expr(p):
     '''call_expr : primary_expr LPAREN parameter_list_opt RPAREN
                  | primary_expr GENERICMARK LESS type_spec type_spec_comma_nest GREATER LPAREN parameter_list_opt RPAREN'''
-    p[0] = f'call_expr {p[1]}'
+    if len(p) == 5:
+        p[0] = ast.CallExpression(p.lineno(3), p[1], [], p[3])
+    else:
+        p[0] = ast.CallExpression(p.lineno(2), p[1], [p[4]] + p[5], p[8])
 
 
 def p_generics_specialization_list_opt(p):
     '''generics_specialization_list_opt : LESS type_spec type_spec_comma_nest GREATER
                                         | empty'''
-    pass
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
 
 def p_type_spec_comma_nest(p):
     '''type_spec_comma_nest : COMMA type_spec type_spec_comma_nest
                             | empty'''
-
-    pass
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
 
 def p_parameter_list(p):
     '''parameter_list : expression expression_comma_nest'''
-    pass
+    p[0] = p[2]
 
 def p_expression_comma_nest(p):
     '''expression_comma_nest : COMMA expression expression_comma_nest
                              | empty'''
-    pass
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
 
 def p_lambda_expr(p):
     '''lambda_expr : FUNC function_sign block_statement'''
+    p[0] = ast.LambdaExpression(p.lineno(1), p[2], p[3])
 
 def p_io_expr(p):
     '''io_expr : in_out LESS type_spec GREATER LPAREN STRING RPAREN'''
+    p[0] = ast.IOExpression(p.lineno(1), p[1], p[3], p[6])
 
 def p_in_out(p):
     '''in_out : IN
               | OUT'''
+    p[0] = IOType[p.slice[1].type]
 
 # 空产生式
 def p_empty(p):
