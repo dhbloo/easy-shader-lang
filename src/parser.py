@@ -467,7 +467,7 @@ def p_index_expr(p):
 
 def p_ref_expr(p):
     '''ref_expr : REF LPAREN expression RPAREN'''
-
+    p[0] = ast.RefExpression(p.lineno(2), p[3])
 
 def p_cast_expr(p):
     '''cast_expr : LPAREN type_spec RPAREN expression'''
