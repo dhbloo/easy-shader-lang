@@ -1,12 +1,9 @@
 import ply.yacc as yacc
-import argparse
-import sys
-import logging
 from termcolor import colored
 
-from lexer import *
-from enums import BasicType, BinaryOp, UnaryOp, IOType
-import ast
+from .lexer import *
+from .enums import BasicType, BinaryOp, UnaryOp, IOType
+from . import ast
 
 
 start = 'start'  # 起始符号
@@ -565,26 +562,5 @@ def p_error(p):
     print(colored("Syntax error in input!", color='red'), "Traceback", p)
 
 
-logging.basicConfig(
-    level = logging.DEBUG,
-    filename = "parselog.txt",
-    filemode = "w",
-    format = "%(filename)10s:%(lineno)4d:%(message)s"
-)
-log = logging.getLogger()
-lexer = lex.lex()
-parser = yacc.yacc(start='start', debug=log)
-
-if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
-    args = arg_parser.parse_args()
-
-    with args.file as f:
-        program_str = f.read()
-        print(program_str)
-        print('=' * 60)
-        
-    clear_context()
-    result = parser.parse(program_str, tracking=True)
-    print(result)
+def create_parser(debug=None):
+    return yacc.yacc(start='start', debug=debug)

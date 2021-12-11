@@ -1,6 +1,4 @@
 import ply.lex as lex
-import argparse
-import sys
 
 context = {
     "struct" : [],
@@ -11,7 +9,7 @@ context = {
     "last_scope_is_top" : False,
 }
 
-def clear_context():
+def init_lexer_context():
     context["struct"].clear()  # strcut名
     context["interface"].clear()  # interface名
     context["type_alias"].clear()  # interface名
@@ -118,7 +116,7 @@ reserved = {
     'func'      : 'FUNC',
     'return'    : 'RETURN',
     'interface' : 'INTERFACE',
-    'sampler'   : 'SAMPLER'
+    # 'sampler'   : 'SAMPLER'
 }
 
 tokens = tokens + list(reserved.values())
@@ -259,25 +257,5 @@ def t_error(t):
     t.lexer.skip(1)
 
 
-if __name__ == '__main__':
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
-    args = arg_parser.parse_args()
-
-    lexer = lex.lex()
-
-    with args.file as f:
-        program_str = f.read()
-        print(program_str)
-        print('=' * 60)
-        
-    clear_context()
-    lexer.input(program_str)
-
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break  # No more input
-        print(tok)
-
-
+def create_lexer():
+    return lex.lex()

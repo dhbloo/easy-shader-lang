@@ -146,5 +146,5 @@ cython_debug/
 
 .DS_Store
 
-src/parser.out
+parser.out
 parselog.txt
