@@ -5,10 +5,9 @@ import logging
 from termcolor import colored
 
 from lexer import *
-import ast
 from enums import BasicType, BinaryOp, UnaryOp, IOType
+import ast
 
-# from src.ast import TranslationUnit
 
 start = 'start'  # 起始符号
 
@@ -24,9 +23,9 @@ def p_translationUnit_nest(p):
                         | empty'''
     if p[1]:
         p[0] = p[2]
-        p[0].declaration_list.append(p[1])
+        p[0].add_declaration(p[1])
     else:
-        p[0] = ast.TranslationUnit(p.lineno(1), [])
+        p[0] = ast.TranslationUnit(p.lineno(1))
 
 def p_block_decl(p):
     '''block_decl : type_decl SEMICOLON
@@ -45,7 +44,7 @@ def p_type_decl(p):
 def p_type_alias_decl(p):
     '''type_alias_decl : TYPE ID ASSIGN type_spec'''
     context["type_alias"].append(p[2])
-    p[0] = ast.TypeAliasDecl(p.lineno(1), p[2], p[3])
+    p[0] = ast.TypeAliasDecl(p.lineno(1), p[2], p[4])
 
 def p_variable_decl(p):
     '''variable_decl : LET declarator declarator_nest'''
@@ -203,6 +202,8 @@ def p_member_decl(p):
                    | function_def
                    | type_function_def'''
     p[0] = p[1]
+    if isinstance(p[0], ast.FunctionDefinition):
+        p[0] = ast.MemberFuncDefinition(p.lineno(1), p[0])
 
 def p_type_function_def(p):
     '''type_function_def : type_function_decl block_statement'''

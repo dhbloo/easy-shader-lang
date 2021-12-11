@@ -34,12 +34,25 @@ class Node():
 class TranslationUnit(Node):
     def __init__(self, loc, decl_list : List[BlockDeclaration | FunctionDecl] = []) -> None:
         super().__init__(loc)
-        self.declaration_list = decl_list
+        self.block_declaration_list = []
+        self.func_definition_list = []
+        for decl in decl_list:
+            self.add_declaration(decl)
+
+    def add_declaration(self, decl):
+        if isinstance(decl, BlockDeclaration):
+            self.block_declaration_list.insert(0, decl)
+        elif isinstance(decl, FunctionDefinition):
+            self.func_definition_list.insert(0, decl)
+        else:
+            raise TypeError(f'unknown declaration type {type(decl)}')
 
     def __str__(self, ind=Indent()) -> str:
         out = 'Translation Unit:\n'
-        for decl in self.declaration_list:
+        for decl in self.block_declaration_list:
             out += decl.__str__(ind+1)
+        for defi in self.func_definition_list:
+            out += defi.__str__(ind+1)
         return out
 
 class BlockDeclaration(Node):
@@ -55,7 +68,7 @@ class TypeAliasDecl(TypeDeclaration):
         self.type_spec = type_spec
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Type Alias:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n'
+        return f'{ind}Type Alias:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n'
 
 class Declarator(Node):
     def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier], init_expr : Expression) -> None:
@@ -67,7 +80,7 @@ class Declarator(Node):
 
     def __str__(self, ind=Indent()) -> str:
         const = '(const)' if self.is_const else ' '
-        return f'{ind}Declarator: {const}\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n{ind+1}Initializer:\n{self.init_expr.__str__(ind+2)}'
+        return f'{ind}Declarator: {const}\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2) if self.type_spec else "(empty)"}\n{ind+1}Initializer:\n{self.init_expr.__str__(ind+2)}'
 
 class VariableDecl(BlockDeclaration):
     def __init__(self, loc, declarator_list : List[Declarator], is_const : bool) -> None:
@@ -144,7 +157,7 @@ class ArrayType(TypeSpecifier):
         self.size = size
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{self.type}[{self.size}]'
+        return f'{self.type.__str__(ind+1)}[{self.size or ""}]'
 
 class ReferenceType(TypeSpecifier):
     def __init__(self, loc, type : TypeSpecifier) -> None:
@@ -152,7 +165,7 @@ class ReferenceType(TypeSpecifier):
         self.type = type
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{self.type} ref'
+        return f'{self.type.__str__(ind+1)} ref'
 
 class FunctionType(TypeSpecifier):
     def __init__(self, loc, func_sign : FunctionSignature) -> None:
@@ -160,7 +173,7 @@ class FunctionType(TypeSpecifier):
         self.func_sign = func_sign
 
     def __str__(self, ind=Indent()) -> str:
-        return self.func_sign.__str__(ind)
+        return f'(\n{self.func_sign.__str__(ind)}{ind})'
 
 
 ###########################################################
@@ -200,7 +213,7 @@ class ParameterDecl(Node):
         self.type_spec = type_spec
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Parameter Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec or "(Empty)"}\n'
+        return f'{ind}Parameter Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2) if self.type_spec else "(Empty)"}\n'
 
 
 ###########################################################
@@ -226,9 +239,20 @@ class StructDecl(TypeDeclaration):
     def __init__(self, loc, identifier : str, member_list : List[StructMember], generics_type_list : List[GenericsType] = [], base_type : Optional[ComplexType] = None) -> None:
         super().__init__(loc)
         self.identifier = identifier
-        self.member_list = member_list
         self.generics_type_list = generics_type_list
         self.base_type = base_type
+        self.member_decl_list = []
+        self.member_func_definition_list = []
+        for member in member_list:
+            self.add_member(member)
+
+    def add_member(self, member):
+        if isinstance(member, MemberDecl):
+            self.member_decl_list.insert(0, member)
+        elif isinstance(member, MemberFuncDefinition) or isinstance(member, MemberTypeFuncDefinition):
+            self.member_func_definition_list.insert(0, member)
+        else:
+            raise TypeError(f'unknown member type {type(member)}')
 
     def __str__(self, ind=Indent()) -> str:
         out = f'{ind}Struct Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Generic Types:\n'
@@ -236,7 +260,9 @@ class StructDecl(TypeDeclaration):
             out += generic_type.__str__(ind+2)
         out += f'{ind+1}Base Type: {self.base_type or "(Empty)"}\n'
         out += f'{ind+1}Members:\n'
-        for member in self.member_list:
+        for member in self.member_decl_list:
+            out += member.__str__(ind+2)
+        for member in self.member_func_definition_list:
             out += member.__str__(ind+2)
         return out
 
@@ -244,15 +270,15 @@ class InterfaceDecl(TypeDeclaration):
     def __init__(self, loc, identifier : str, member_list : List[InterfaceMember], generics_type_list : List[GenericsType] = []) -> None:
         super().__init__(loc)
         self.identifier = identifier
-        self.member_list = member_list
         self.generics_type_list = generics_type_list
+        self.member_decl_list = member_list
 
     def __str__(self, ind=Indent()) -> str:
         out = f'{ind}Interface Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Generic Types:\n'
         for generic_type in self.generics_type_list:
             out += generic_type.__str__(ind+2)
         out += f'{ind+1}Members:\n'
-        for member in self.member_list:
+        for member in self.member_decl_list:
             out += member.__str__(ind+2)
         return out
 
@@ -269,7 +295,7 @@ class MemberDecl(StructMember):
         self.type_spec = type_spec
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Member Declarator:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec}\n'
+        return f'{ind}Member Declarator:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n'
 
 class MemberFuncDecl(InterfaceMember):
     def __init__(self, loc, func_decl : FunctionDecl) -> None:
@@ -294,7 +320,7 @@ class MemberTypeFuncDecl(InterfaceMember):
         self.func_sign = func_sign
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Member Type Function Declaration:\n{ind+1}Type: {self.type_spec}\n{self.func_sign.__str__(ind+1)}'
+        return f'{ind}Member Type Function Declaration:\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n{self.func_sign.__str__(ind+1)}'
 
 class MemberTypeFuncDefinition(StructMember):
     def __init__(self, loc, type_func_decl : MemberTypeFuncDecl, block_stmt : BlockStatement) -> None:
@@ -332,7 +358,7 @@ class BlockStatement(Statement):
         return out
 
 class ExpressionStatement(Statement):
-    def __init__(self, loc, expression : Expression) -> None:#############################Optional[Expression])
+    def __init__(self, loc, expression : Expression) -> None:
         super().__init__(loc)
         self.expression = expression
 
@@ -437,7 +463,7 @@ class BinaryExpression(Expression):
         return f'{ind}Binary Expression:\n{ind+1}BinaryOp: {self.operator.name}\n{self.lhs_expr.__str__(ind+1)}{self.rhs_expr.__str__(ind+1)}'
 
 class UnaryExpression(Expression):
-    def __init__(self, loc, expression : Expression, operator : UnaryOp) -> None:  ##########无操作符
+    def __init__(self, loc, expression : Expression, operator : UnaryOp) -> None:
         super().__init__(loc)
         self.expression = expression
         self.operator = operator
@@ -508,7 +534,7 @@ class CastExpression(PrimaryExpression):
         self.cast_expr = cast_expr
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Cast Expression:\n{ind+1}Type: {self.type_spec}\n{ind+1}Member ID:\n{self.cast_expr.__str__(ind+2)}\n'
+        return f'{ind}Cast Expression:\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n{ind+1}Member ID:\n{self.cast_expr.__str__(ind+2)}\n'
 
 class NewExpression(PrimaryExpression):
     def __init__(self, loc, type_spec : TypeSpecifier, param_list : List[Expression] = []) -> None:
@@ -517,7 +543,7 @@ class NewExpression(PrimaryExpression):
         self.param_list = param_list
 
     def __str__(self, ind=Indent()) -> str:
-        out = f'{ind}New Expression:\n{ind+1}Type: {self.type_spec}\n{ind+1}Parameters:\n'
+        out = f'{ind}New Expression:\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n{ind+1}Parameters:\n'
         for param in self.param_list:
             out += param.__str__(ind+2)
         return out
@@ -532,7 +558,9 @@ class CallExpression(PrimaryExpression):
     def __str__(self, ind=Indent()) -> str:
         out = f'{ind}Call Expression:\n'
         out += f'{ind+1}Function:\n{self.func_expr.__str__(ind+2)}'
-        out += f'{ind+1}Generics: {self.generics_spec_list or "(Empty)"}\n'
+        out += f'{ind+1}Generics:\n'
+        for i, generics_spec in enumerate(self.generics_spec_list):
+            out += f'{ind+2}[{i}]: {generics_spec.__str__(ind+3)}\n'
         out += f'{ind+1}Parameters:\n'
         for param in self.param_list:
             out += param.__str__(ind+2)
@@ -546,7 +574,7 @@ class IOExpression(PrimaryExpression):
         self.name = name
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}IO Expression: ({self.io_type.name})\n{ind+1}Type: {self.type_spec}\n{ind+1}Name: {self.name}\n'
+        return f'{ind}IO Expression: ({self.io_type.name})\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n{ind+1}Name: {self.name}\n'
 
 class LambdaExpression(PrimaryExpression):
     def __init__(self, loc, func_sign : FunctionSignature, block_stmt : BlockStatement) -> None:

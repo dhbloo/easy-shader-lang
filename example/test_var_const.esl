@@ -7,15 +7,13 @@ let time : f32 = in<i32>("time");
 let result : f32 ref = out<i32>("result");
 let S = b + c * d;
 type mat3 = f32[3][3];
-struct M{
+struct M {
     a : i32;
 };
 let length : M<f32> = 1;
 let m = M(1);
 
-func A(){
-
-}
+func A() {}
 let c = A(1);
 
 let temp_m = M(1);

@@ -18,7 +18,8 @@ struct A <Q> {
 
 struct F {
     a : i32;
-    func call(x : A<i32>, y:A<i32>) {
-        return x + y;
+    b : f32;
+    func call(self, x : A<i32>, y:A<i32>) {
+        return x + y + self.a + (i32)self.b;
     }
 };
