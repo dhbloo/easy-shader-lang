@@ -112,7 +112,11 @@ def p_simple_type(p):
 def p_complex_type(p):
     '''complex_type : INTERFACEID generics_specialization_list_opt
                     | STRUCTID generics_specialization_list_opt'''
-    p[0] = ast.ComplexType(p.lineno(1), p[1], p[2])
+    # print(p.slice[1].type, p[1], p[2])
+    if p.slice[1].type == 'INTERFACEID':
+        p[0] = ast.ComplexType(p.lineno(1), p[1], True, p[2])
+    else:
+        p[0] = ast.ComplexType(p.lineno(1), p[1], False, p[2])
 
 def p_generic_type(p):
     '''generic_type : GENERICID'''
@@ -513,7 +517,7 @@ def p_type_spec_comma_nest(p):
 
 def p_parameter_list(p):
     '''parameter_list : expression expression_comma_nest'''
-    p[0] = p[2]
+    p[0] = [p[1]] + p[2]
 
 def p_expression_comma_nest(p):
     '''expression_comma_nest : COMMA expression expression_comma_nest

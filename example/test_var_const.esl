@@ -7,17 +7,18 @@ let time : f32 = in<i32>("time");
 let result : f32 ref = out<i32>("result");
 let S = b + c * d;
 type mat3 = f32[3][3];
-struct M {
+struct M<T, U>{
     a : i32;
 };
-let length : M<f32> = 1;
-let m = M(1);
+let length : M<f32, i32> = 1;
+let m = M<f32, i32>(1);
 
 func A() {}
 let c = A(1);
 
-let temp_m = M(1);
-
 type vec3 = f32[3];
 let v = vec3(1.0f, 2.0f, 3.0f);
 
+func max<T>(array: T[] ref) -> T;
+func max<T, U>(array: T[] ref) -> U;
+let a = max '<i32, i64>();
