@@ -1,8 +1,11 @@
 interface Geometry{
 
 };
+interface Geometry1{
 
-struct Sphere<T> : Geometry {
+};
+
+struct Sphere<T> : Geometry, Geometry1 {
 
 };
 

@@ -144,7 +144,7 @@ def p_function_type(p):
     p[0] = ast.FunctionType(p.lineno(1), p[1])
 
 def p_struct_decl(p):
-    '''struct_decl : STRUCT ID new_struct generics_type_list_opt complex_type_colon_opt LBRACE member_decl_nest RBRACE'''
+    '''struct_decl : STRUCT ID new_struct generics_type_list_opt base_type_list_opt LBRACE member_decl_nest RBRACE'''
     context["generic_top"].clear()
     p[0] = ast.StructDecl(p.lineno(1), p[2], p[7], p[4], p[5])
 
@@ -153,15 +153,22 @@ def p_new_struct(p):
     context["struct"].append(p[-1])
     context["last_scope_is_top"] = True
 
-
-def p_complex_type_colon_opt(p):
-    '''complex_type_colon_opt : COLON complex_type
-                              | empty'''
+def p_base_type_list_opt(p):
+    '''base_type_list_opt : COLON complex_type complex_type_nest
+                          | empty'''
     if p[1]:
-        p[0] = p[2]
+        p[0] = [p[2]] + p[3]
     else:
-        p[0] = None
-    
+        p[0] = []
+
+def p_complex_type_nest(p):
+    '''complex_type_nest : COMMA complex_type complex_type_nest
+                         | empty'''
+    if p[1]:
+        p[0] = [p[2]] + p[3]
+    else:
+        p[0] = []
+
 def p_interface_decl(p):
     '''interface_decl : INTERFACE ID new_interface generics_type_list_opt LBRACE  interface_member_decl_nest RBRACE'''
     context["generic_top"].clear()

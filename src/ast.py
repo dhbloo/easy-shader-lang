@@ -236,7 +236,7 @@ class GenericsType(Node):
 ###########################################################
 
 class StructDecl(TypeDeclaration):
-    def __init__(self, loc, identifier : str, member_list : List[StructMember], generics_type_list : List[GenericsType] = [], base_type : Optional[ComplexType] = None) -> None:
+    def __init__(self, loc, identifier : str, member_list : List[StructMember], generics_type_list : List[GenericsType] = [], base_type : list[ComplexType] = []) -> None:
         super().__init__(loc)
         self.identifier = identifier
         self.generics_type_list = generics_type_list
