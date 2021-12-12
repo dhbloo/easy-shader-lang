@@ -5,6 +5,8 @@ func map<T>(array : T[] ref, mapper : (a:T) -> T) {
 }
 
 func lambda_test() {
-    let arr = i32[8](1, 2, 3, 4, 5, 6, 7, 8);
+    let arr = i32[8](1, 2, 3);
     map(arr, func(x) { return x * x; });
+    map(arr, func<T>(x : T) -> T { return x * x; });
+    map(arr, func<T>(x : T) -> T { return x * x; });
 }

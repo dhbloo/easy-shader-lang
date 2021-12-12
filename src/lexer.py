@@ -83,6 +83,7 @@ tokens = [
     'DOT',              # .
     'SEMICOLON',        # ;
     'GENERICMARK',      # '
+    'COMMENT',          # #
 ]
 
 # 保留字
@@ -159,45 +160,6 @@ t_GENERICMARK   = r'\''
 
 
 
-# 匹配到泛型类型声明的第一个<，进入泛型状态
-# def t_generics(t):
-#     r'\<'
-#     # t.lexer.code_start = t.lexer.lexpos  # Record the starting position
-#     t.lexer.level = 1  # Initial brace level
-#     t.lexer.begin('generics')  # Enter 'generics' state
-#     t.type = 'LESS'
-#     t.value = '<'
-#     print(t.type)
-#     return t
-#
-# # 泛型状态规则
-# def t_generics_LANGRBRACKET(t):
-#     r'\<'
-#     t.lexer.level += 1
-#     return t
-#
-#
-# def t_generics_RANGRBRACKET(t):
-#     r'\>'
-#     t.lexer.level -= 1
-#
-#     # If closing brace, return the code fragment
-#     if t.lexer.level == 0:
-#         # t.value = t.lexer.lexdata[t.lexer.code_start-1:t.lexer.lexpos]
-#         # t.type = "GENERICS"
-#         t.lexer.lineno += t.value.count('\n')
-#         t.lexer.begin('INITIAL')
-#     return t
-
-
-
-# # 忽略空格
-# t_generics_ignore = " \t\n"
-#
-#
-# # 错误跳过
-# def t_generics_error(t):
-#     t.lexer.skip(1)
 
 
 # b不同精度浮点数匹配规则
@@ -256,6 +218,10 @@ def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
 
+# 注释
+def t_COMMENT(t):
+    r'\#.*'
+    pass
 
 def create_lexer():
     return lex.lex()

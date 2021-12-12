@@ -526,6 +526,7 @@ def p_expression_comma_nest(p):
 
 def p_lambda_expr(p):
     '''lambda_expr : FUNC function_sign block_statement'''
+    context["generic_func"].clear()
     p[0] = ast.LambdaExpression(p.lineno(1), p[2], p[3])
 
 def p_io_expr(p):
