@@ -2,10 +2,10 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 from llvmlite import ir
 
-from .ast import ComplexType, Node
+from .ast import Node
 from .enums import BasicType, TypeKind
-from .codegen import SemanticError
-from .symbol import SymbolTable, Symbol
+from .error import SemanticError
+from . import symbol
 
 
 class Type():
@@ -15,7 +15,6 @@ class Type():
                  generic_type_range : Optional[Type] = None,
                  struct_name : Optional[str] = None,
                  is_interface : bool = False) -> None:
-        super().__init__()
         assert ((basic_type or generic_name or struct_name) and 
                 not (basic_type and generic_name) or 
                 not (basic_type and struct_name) or
@@ -33,7 +32,7 @@ class Type():
         self.struct_name : Optional[str] = struct_name
         self.is_interface : bool = is_interface
         self.base_type : Optional[Type] = None
-        self.member_list : List[Symbol] = []
+        self.member_list : List[symbol.Symbol] = []
 
         # Array type
         self.array_dims : List[int] = []  # 0 for empty size
@@ -42,11 +41,11 @@ class Type():
         self.reference = False
 
         # Function type
-        self.func_params : Optional[List[Symbol]] = None
+        self.func_params : Optional[List[symbol.Symbol]] = None
 
         # Struct / Interface / Function type
         self.generics_type_list : List[Type] = []
-        self.symbol_table : Optional[SymbolTable] = None
+        self.symbol_table : Optional[symbol.SymbolTable] = None
         self.unfinished_node : Optional[Node] = None
 
     def get_kind(self) -> TypeKind:
@@ -72,8 +71,8 @@ class Type():
         self.is_const = True
         return self
 
-    def add_symbol_table(self, parent_symbol_table : SymbolTable) -> Type:
-        self.symbol_table = SymbolTable(parent_symbol_table, self)
+    def add_symbol_table(self, parent_symbol_table : symbol.SymbolTable) -> Type:
+        self.symbol_table = symbol.SymbolTable(parent_symbol_table, self)
         return self
 
     def add_generics_type(self, generics_type : Type) -> Type:
@@ -89,7 +88,7 @@ class Type():
         self.base_type = base_type
         return self
 
-    def add_struct_member(self, member : Symbol) -> Type:
+    def add_struct_member(self, member : symbol.Symbol) -> Type:
         self.member_list.append(member)
         return self
 
@@ -105,7 +104,7 @@ class Type():
         self.reference = True
         return self
 
-    def add_func_params(self, param_list : List[Symbol]) -> Type:
+    def add_func_params(self, param_list : List[symbol.Symbol]) -> Type:
         self.func_params = param_list
         return self
 
@@ -142,17 +141,78 @@ class Type():
         temp_type.generics_type_list = [*self.generics_type_list]
         temp_type.symbol_table = self.symbol_table
         temp_type.unfinished_node = self.unfinished_node
+        return temp_type
 
-    # def __eq__(self, type: Type) -> bool:
-    #     if not isinstance(type, Type):
-    #         return False
-    #     kind = self.get_kind()
-    #     if kind != type.get_kind():
-    #         return False
-    #     return True
+    def __eq__(self, type: Type) -> bool:
+        if not isinstance(type, Type):
+            return False
+
+        kind1, kind2 = self.get_kind(), type.get_kind()
+        if kind1 == TypeKind.AUTO and kind2 == TypeKind.AUTO:
+            return True
+        elif kind1 == TypeKind.BASIC and kind2 == TypeKind.BASIC:
+            return self.basic_type == type.basic_type
+        elif kind1 == TypeKind.GENERIC and kind2.GENERIC:
+            # TODO: better check
+            return self.generic_name == type.generic_name
+        elif kind1 == TypeKind.STRUCT and kind2 == TypeKind.STRUCT:
+            return self.struct_name == type.struct_name
+        elif kind1 == TypeKind.ARRAY and kind2 == TypeKind.ARRAY:
+            return self.clone().to_element_type() == type.clone().to_element_type()
+        elif kind1 == TypeKind.REFERENCE and kind2 == TypeKind.REFERENCE:
+            return self.clone().remove_ref() == type.clone().remove_ref()
+        elif kind1 == TypeKind.FUNCTION and kind2 == TypeKind.FUNCTION:
+            ret_type_eq = self.clone().to_return_type() == type.clone().to_return_type()
+            if not ret_type_eq:
+                return False
+            if len(self.func_params) != len(type.func_params):
+                return False
+            for param1, param2 in zip(self.func_params, type.func_params):
+                if not (param1 == param2):
+                    return False
+            return True
+
+        return False
 
     def specialize(self, generics_spec_list : List[Type]) -> Type:
         pass
 
     def to_ir_type(self) -> ir.Type:
-        pass
+        kind = self.get_kind()
+        if kind == TypeKind.BASIC:
+            if self.basic_type == BasicType.VOID:
+                return ir.VoidType()
+            if self.basic_type == BasicType.BOOL:
+                return ir.IntType(1)
+            elif self.basic_type == BasicType.F16:
+                return ir.HalfType()
+            elif self.basic_type == BasicType.F32:
+                return ir.FloatType()
+            elif self.basic_type == BasicType.F64:
+                return ir.DoubleType()
+            elif self.basic_type == BasicType.I8 or self.basic_type == BasicType.U8:
+                return ir.IntType(8)
+            elif self.basic_type == BasicType.I16 or self.basic_type == BasicType.U8:
+                return ir.IntType(16)
+            elif self.basic_type == BasicType.I32 or self.basic_type == BasicType.U8:
+                return ir.IntType(32)
+            elif self.basic_type == BasicType.I64 or self.basic_type == BasicType.U8:
+                return ir.IntType(64)
+            else:
+                raise NotImplementedError(f'IR BasicType {self.basic_type} not implemented')
+        elif kind == TypeKind.STRUCT:
+            raise NotImplementedError()
+        elif kind == TypeKind.ARRAY:
+            element_ir_type = self.clone().to_element_type().to_ir_type()
+            return ir.ArrayType(element_ir_type, self.array_dims[-1])
+        elif kind == TypeKind.REFERENCE:
+            refered_ir_type = self.clone().remove_ref().to_ir_type()
+            return ir.PointerType(refered_ir_type)
+        elif kind == TypeKind.FUNCTION:
+            ret_ir_type = self.clone().to_return_type().to_ir_type()
+            param_ir_types = []
+            for param in self.func_params:
+                param_ir_types.append(param.type.to_ir_type())
+            return ir.FunctionType(ret_ir_type, param_ir_types)
+        else:
+            assert False, "uninstantiabled type!"

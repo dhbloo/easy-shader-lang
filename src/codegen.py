@@ -1,25 +1,20 @@
 from typing import List, Tuple, Optional
-import utils.visitor as visitor
+from .utils import visitor
 from llvmlite import ir
 from .enums import BasicType, BinaryOp, TypeKind, UnaryOp, IOType
-from .symbol import Symbol, SymbolTable, Type
+from .symbol import SymbolTable, Type
+from .error import SemanticError
 from . import ast
-
-
-class SemanticError(RuntimeError):
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
-        
+     
 
 class CodeGenContext():
     def __init__(self, module_name) -> None:
-        super().__init__(self)
         self.module = ir.Module(name=module_name)
         self.visitor = CodeGenVisitor(self)
 
         self.scope_stack : List[Tuple[SymbolTable, ir.IRBuilder, Type]] = []
         self.block_stack : List[Tuple[ir.Block, ir.Block]] = []
-        self.symbol_table = SymbolTable(None)
+        self.symbol_table = SymbolTable(None, None)
         self.ir_builder : ir.IRBuilder = None
         self.deduced_ret_type : Optional[Type] = None
         self.current_type : Type = None
@@ -62,7 +57,25 @@ class CodeGenContext():
         if src_type == dst_type:
             return True, src_value
 
-        # 
+        # 左值转换为右值（load）
+        if src_type.get_kind() == TypeKind.REFERENCE and dst_type.get_kind() != TypeKind.REFERENCE:
+            src_val_type = src_type.clone().remove_ref()
+            src_value = self.ir_builder.load(src_value)
+            return self.convert_type(src_val_type, dst_type, src_value)
+
+        # 基本类型转换
+        # 1. 向上转换: i8 -> i16 -> i32 -> i64, f16 -> g32 -> f64
+        # 2. 整数类型向bool转换: i32 -> bool
+        if src_type.get_kind() == TypeKind.BASIC and dst_type.get_kind() == TypeKind.BASIC:
+            src_bt, dst_bt = src_type.basic_type, dst_type.basic_type
+            is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64
+            if is_integer(src_bt) and is_integer(dst_bt):
+                pass #实现转换1
+            elif is_integer(src_bt) and dst_bt == BasicType.BOOL:
+                pass #实现转换2
+            else:
+                # 不符合基本类型转换规则
+                return False, None
 
         raise NotImplementedError()
 
@@ -73,7 +86,6 @@ class CodeGenContext():
 
 class CodeGenVisitor():
     def __init__(self, context : CodeGenContext) -> None:
-        super().__init__(self)
         self.ctx = context
 
     @visitor.on('node')
@@ -92,7 +104,7 @@ class CodeGenVisitor():
     @visitor.when(ast.VariableDecl)
     def visit(self, node: ast.VariableDecl):
         for declarator in node.declarator_list:
-            declarator.accept(declarator)
+            declarator.accept(self)
 
     @visitor.when(ast.Declarator)
     def visit(self, node: ast.Declarator):
@@ -160,24 +172,6 @@ class CodeGenVisitor():
     @visitor.when(ast.SimpleType)
     def visit(self, node: ast.SimpleType):
         self.ctx.current_type = Type(basic_type=node.type)
-        # if node.type == BasicType.BOOL:
-        #     self.ctx.current_type = Type(ir.IntType(1), node.type)
-        # elif node.type == BasicType.F16:
-        #     self.ctx.current_type = Type(ir.HalfType(), node.type)
-        # elif node.type == BasicType.F32:
-        #     self.ctx.current_type = Type(ir.FloatType(), node.type)
-        # elif node.type == BasicType.F64:
-        #     self.ctx.current_type = Type(ir.DoubleType(), node.type)
-        # elif node.type == BasicType.I8 or node.type == BasicType.U8:
-        #     self.ctx.current_type = Type(ir.IntType(8), node.type)
-        # elif node.type == BasicType.I16 or node.type == BasicType.U8:
-        #     self.ctx.current_type = Type(ir.IntType(16), node.type)
-        # elif node.type == BasicType.I32 or node.type == BasicType.U8:
-        #     self.ctx.current_type = Type(ir.IntType(32), node.type)
-        # elif node.type == BasicType.I64 or node.type == BasicType.U8:
-        #     self.ctx.current_type = Type(ir.IntType(64), node.type)
-        # else:
-        #     raise NotImplementedError(f'IR BasicType {node.type.name} not implemented')
 
     @visitor.when(ast.ComplexType)
     def visit(self, node: ast.ComplexType):

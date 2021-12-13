@@ -1,2 +1,6 @@
 let a : i32 = 1;    # int
 let b : f64 = 1.0;  # double
+
+func inc_one(x : i32) -> i32 {
+    return x;
+}

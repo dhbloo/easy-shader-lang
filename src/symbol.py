@@ -2,13 +2,12 @@ from __future__ import annotations
 from typing import Dict, Optional
 from llvmlite import ir
 
-from .codegen import SemanticError
+from .error import SemanticError
 from .type import Type
 
 
 class Symbol():
     def __init__(self, id : str, type : Type, value : Optional[ir.Value]) -> None:
-        super().__init__()
         self.id = id
         self.type = type
         self.value = value
@@ -16,7 +15,6 @@ class Symbol():
 
 class SymbolTable():
     def __init__(self, parent : Optional[SymbolTable], parent_type : Optional[Type]) -> None:
-        super().__init__(self)
         self.parent = parent
         self.parent_type = parent_type
         self.type_table : Dict[str, Type] = {}
