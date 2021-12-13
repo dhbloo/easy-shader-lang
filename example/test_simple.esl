@@ -9,6 +9,7 @@ func inc_one(x : i32) -> i32 {
     return x;
 }
 
+
 #let c : bool = 1;
 #let d : bool = 1;
 #let e : bool = c || d;
@@ -16,3 +17,7 @@ func inc_one(x : i32) -> i32 {
 #let f : i32 = 1;
 #let g : i32 = 1;
 #let h : i32 = f + g;
+
+func deduce_ret_type(x : i64) {
+    return x;
+}
