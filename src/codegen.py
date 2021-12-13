@@ -21,12 +21,13 @@ class CodeGenContext():
         self.current_value : ir.Value = None
         self.current_break_block : ir.Block = None
         self.current_continue_block : ir.Block = None
+        self.create_global_init_function()
 
     def create_global_init_function(self):
         self.init_func_type = ir.FunctionType(ir.VoidType(), ())
         self.init_func = ir.Function(self.module, self.init_func_type, "__init__")
         block = self.init_func.append_basic_block('entry')
-        self.init_func_ir_builder = ir.IRBuilder(block)
+        self.ir_builder = ir.IRBuilder(block)
         
     def push_scope(self, symbol_table : SymbolTable, ir_builder : ir.IRBuilder, deduced_ret_type = None) -> None:
         """创建一个新的作用域"""
@@ -64,17 +65,33 @@ class CodeGenContext():
             return self.convert_type(src_val_type, dst_type, src_value)
 
         # 基本类型转换
-        # 1. 向上转换: i8 -> i16 -> i32 -> i64, f16 -> g32 -> f64
+        # 1. 向上转换: i8 -> i16 -> i32 -> i64, f16 -> f32 -> f64
         # 2. 整数类型向bool转换: i32 -> bool
         if src_type.get_kind() == TypeKind.BASIC and dst_type.get_kind() == TypeKind.BASIC:
             src_bt, dst_bt = src_type.basic_type, dst_type.basic_type
-            is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64
+            is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
+            is_float = lambda bt: bt.value >= BasicType.F16.value
             if is_integer(src_bt) and is_integer(dst_bt):
-                pass #实现转换1
+                is_i_src = src_bt.value in [2, 4, 6, 8]
+                is_i_dst = dst_bt.value in [2, 4, 6, 8]
+                # u->i 0扩展 u->i 0扩展 i->i符号扩展
+                if (not is_i_src) and (src_bt.value < dst_bt.value):
+                    src_value = self.ir_builder.zext(src_value, dst_type.to_ir_type())
+                elif is_i_src and is_i_dst and (src_bt.value < dst_bt.value):
+                    src_value = self.ir_builder.sext(src_value, dst_type.to_ir_type())
+                else:
+                    return False, None
+                return True, src_value
             elif is_integer(src_bt) and dst_bt == BasicType.BOOL:
-                pass #实现转换2
+                res = self.ir_builder.icmp_signed('nq', src_value, src_value.type(0))
+                return True, res
+            elif is_float(src_bt) and is_float(dst_bt):
+                if src_bt.value <= dst_bt.value:
+                    src_value = self.ir_builder.fpext(src_value, dst_type.to_ir_type())
+                    return True, src_value
+                else:
+                    return False, None
             else:
-                # 不符合基本类型转换规则
                 return False, None
 
         raise NotImplementedError()

@@ -23,6 +23,7 @@ class Compiler():
             ast_root.accept(self.codegen_ctx.visitor)
         except SemanticError as err:
             self.error_message = str(err)
+            print('error_message', self.error_message)
             return False
 
         return True
