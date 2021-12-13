@@ -74,8 +74,6 @@ tokens = [
     'RPAREN',           # )
     'LBRACKET',         # [
     'RBRACKET',         # ]
-    # 'LANGRBRACKET',     # <
-    # 'RANGRBRACKET',     # >
     'LBRACE',           # {
     'RBRACE',           # }
     'COMMA',            # ,
@@ -87,6 +85,17 @@ tokens = [
 
 # 保留字
 reserved = {
+    'if'        : 'IF',
+    'else'      : 'ELSE',
+    'for'       : 'FOR',
+    'while'     : 'WHILE',
+    'continue'  : 'CONTINUE',
+    'break'     : 'BREAK',
+    'struct'    : 'STRUCT',
+    'const'     : 'CONST',
+    'func'      : 'FUNC',
+    'return'    : 'RETURN',
+    'interface' : 'INTERFACE',
     'let'       : 'LET',
     'in'        : 'IN',
     'out'       : 'OUT',
@@ -105,18 +114,6 @@ reserved = {
     'f16'       : 'F16',
     'f32'       : 'F32',
     'f64'       : 'F64',
-    'if'        : 'IF',
-    'else'      : 'ELSE',
-    'for'       : 'FOR',
-    'while'     : 'WHILE',
-    'continue'  : 'CONTINUE',
-    'break'     : 'BREAK',
-    'struct'    : 'STRUCT',
-    'const'     : 'CONST',
-    'func'      : 'FUNC',
-    'return'    : 'RETURN',
-    'interface' : 'INTERFACE',
-    # 'sampler'   : 'SAMPLER'
 }
 
 tokens = tokens + list(reserved.values())
@@ -160,13 +157,13 @@ t_GENERICMARK   = r'\''
 
 
 
+# r'[+-]*\d+\.?\d*[Ee]*[+-]*\d+(f|F)?'  # 原版有问题的合并计数,不能如.123
+# r'[+-]*\d+\.\d+([Ee]-?\d+)?'
+# r'[+-]*\d*\.?\d*[Ee]*[+-]*\d+(f|F)?'
 
 # b不同精度浮点数匹配规则
 def t_FLOAT(t):
     r'[-+]?(([0-9]*\.[0-9]+)|([0-9]+\.))(f|F)?'  # 普通浮点计数
-    # r'[+-]*\d+\.?\d*[Ee]*[+-]*\d+(f|F)?'  # 原版有问题的合并计数,不能如.123
-    # r'[+-]*\d+\.\d+([Ee]-?\d+)?'
-    # r'[+-]*\d*\.?\d*[Ee]*[+-]*\d+(f|F)?'
     t.type = 'FLOAT' if t.value[-1] == ('f' or 'F') else 'DOUBLE'
     t.value = float(t.value[:-1] if t.value[-1] == ('f' or 'F') else t.value)
     return t
@@ -178,6 +175,13 @@ def t_HEXADECIMAL(t):
     t.value = t.vlaue.hex()
     return t
 
+# 标识符匹配规则
+def t_ANY_ID(t):
+    r'[a-zA-Z_][a-zA-Z_0-9]*'
+    # Check for reserved words & complex/generic type names
+    # print(t.value)
+    t.type = reserved.get(t.value) or query_name(t.value) or 'ID'
+    return t
 
 # 整数匹配规则
 def t_INT(t):
@@ -190,15 +194,6 @@ def t_INT(t):
 def t_ANY_STRING(t):
     r'\"((\\.)|[^"\\\n])*\"'
     t.value = t.value[1:-1]
-    return t
-
-
-# 标识符匹配规则
-def t_ANY_ID(t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
-    # Check for reserved words & complex/generic type names
-    # print(t.value)
-    t.type = reserved.get(t.value) or query_name(t.value) or 'ID'
     return t
 
 

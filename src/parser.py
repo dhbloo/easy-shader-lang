@@ -462,6 +462,10 @@ def p_operand(p):
         p[0] = ast.ExpressionOperand(p.lineno(1), p[2])
     elif p.slice[1].type == 'ID':
         p[0] = ast.IdentifierOperand(p.lineno(1), p[1])
+    elif p.slice[1].type == 'FLOAT':
+        p[0] = ast.LiteralOperand(p.lineno(1), p[1], is_float=True)
+    elif p.slice[1].type == 'DOUBLE':
+        p[0] = ast.LiteralOperand(p.lineno(1), p[1], is_float=False)
     else:
         p[0] = ast.LiteralOperand(p.lineno(1), p[1])
 
