@@ -1,7 +1,8 @@
 from typing import List, Tuple, Optional
+
 from .utils import visitor
 from llvmlite import ir
-from .enums import BasicType, BinaryOp, TypeKind, UnaryOp, IOType
+from .enums import BasicType, BinaryOp, TypeKind, UnaryOp
 from .symbol import SymbolTable, Type
 from .error import SemanticError
 from . import ast
@@ -29,16 +30,16 @@ class CodeGenContext():
         block = self.init_func.append_basic_block('entry')
         self.ir_builder = ir.IRBuilder(block)
         
-    def push_scope(self, symbol_table : SymbolTable, ir_builder : ir.IRBuilder, deduced_ret_type = None) -> None:
+    def push_scope(self, symbol_table : SymbolTable, ir_builder : ir.IRBuilder, deduced_ret_type : Optional[Type] = None) -> None:
         """创建一个新的作用域"""
         self.scope_stack.append((self.symbol_table, self.ir_builder, self.deduced_ret_type))
         self.symbol_table = symbol_table
         self.ir_builder = ir_builder
         self.deduced_ret_type = deduced_ret_type
 
-    def pop_scope(self) -> Tuple[SymbolTable, ir.IRBuilder]:
+    def pop_scope(self) -> Tuple[SymbolTable, ir.IRBuilder, Optional[Type]]:
         """恢复上一个作用域"""
-        poped_scope = (self.symbol_table, self.ir_builder)
+        poped_scope = (self.symbol_table, self.ir_builder, self.deduced_ret_type)
         (self.symbol_table, self.ir_builder, self.deduced_ret_type) = self.scope_stack.pop()
         return poped_scope
 
@@ -165,26 +166,42 @@ class CodeGenVisitor():
     def visit(self, node: ast.FunctionDefinition):
         # 解析函数签名与符号
         node.func_decl.accept(self)
+        func_type, func_value = self.ctx.current_type, self.ctx.current_value
         
         # 若当前函数的声明已实例化（值存在），则直接解析函数体
-        if self.ctx.current_value:
-            assert isinstance(self.ctx.current_value, ir.Function)
-            entry_block = self.ctx.current_value.append_basic_block('entry')
+        if func_value:
+            assert isinstance(func_value, ir.Function)
+            entry_block = func_value.append_basic_block('entry')
             func_ir_builder = ir.IRBuilder(entry_block)
 
             # 创建函数参数局部变量，并储存函数入参值
-            assert len(self.ctx.current_type.func_params) == len(self.ctx.current_value.args)
-            for param, arg in zip(self.ctx.current_type.func_params, self.ctx.current_value.args):
+            assert len(func_type.func_params) == len(func_value.args)
+            for param, arg in zip(func_type.func_params, func_value.args):
                 param.value = func_ir_builder.alloca(arg.type, name=param.id)
                 func_ir_builder.store(arg, param.value)
 
             # 解析函数体
-            self.ctx.push_scope(self.ctx.current_type.symbol_table, func_ir_builder)
+            self.ctx.push_scope(func_type.symbol_table, func_ir_builder)
             node.block_stmt.accept(self)
+
+            # 若该函数声明省略了返回值类型，推导其为返回表达式的类型
+            if func_type.clone().to_return_type().get_kind() == TypeKind.AUTO:
+                # 如果没有出现返回值语句，默认为VOID返回值
+                if self.ctx.deduced_ret_type:
+                    # 替换返回值类型得到新函数类型
+                    new_func_type = func_value.function_type
+                    new_func_type.return_type = self.ctx.deduced_ret_type.to_ir_type()
+                    # 重新构建函数值
+                    new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
+                    new_func_value.basic_blocks.append(entry_block)
+                    # 替换符号表中的符号
+                    func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
+                    func_symbol.value = new_func_value
+
             self.ctx.pop_scope()
         # 否则此函数为泛型函数，记录未解析节点至函数类型中
         else:
-            self.ctx.current_type.unfinished_node = node.block_stmt
+            func_type.unfinished_node = node.block_stmt
 
     @visitor.when(ast.SimpleType)
     def visit(self, node: ast.SimpleType):
@@ -192,14 +209,18 @@ class CodeGenVisitor():
 
     @visitor.when(ast.ComplexType)
     def visit(self, node: ast.ComplexType):
+        # 从符号表中查找复杂类型的标识符
         complex_type = self.ctx.symbol_table.query_type(node.identifier)
 
-        if len(node.generics_spec_list) > 0:
-            raise NotImplementedError()
-            generics_spec_list = []
-            for spec_type_node in node.generics_spec_list:
-                spec_type_node.accept(self)
-                generics_spec_list.append(self.ctx.current_type)
+        # 若该复杂类型声明时有带泛型实例化列表，解析该列表
+        generic_specialization_list = []
+        for generic_spec in node.generics_spec_list:
+            generic_spec.accept(self)
+            generic_specialization_list.append(self.ctx.current_type)
+
+        # 对于泛型复杂类型，根据以上列表得到其实例化后的类型
+        if complex_type.has_generics():
+            complex_type = complex_type.specialize(generic_specialization_list)
 
         self.ctx.current_type = complex_type
 
@@ -229,16 +250,22 @@ class CodeGenVisitor():
     def visit(self, node: ast.FunctionDecl):
         # 首先解析函数签名得到函数类型
         node.func_sign.accept(self)
+        func_type = self.ctx.current_type
 
         # 对于非泛型函数，此时可以构建ir.Function
-        if not self.ctx.current_type.has_generics():
-            func_value = ir.Function(self.ctx.module, self.ctx.current_type.to_ir_type(), node.identifier)
+        if not func_type.has_generics():
+            # 若当前函数的返回值未指定，该函数值不会加入到模块中
+            if func_type.clone().to_return_type().get_kind() == TypeKind.AUTO:
+                module = ir.Module()
+            else:
+                module = self.ctx.module
+            func_value = ir.Function(module, func_type.to_ir_type(), node.identifier)
         # 否则对于泛型函数，其符号值目前留空，等待实例化时再生成值
         else:
             func_value = None
 
         # 将该函数符号加入到当前符号表中
-        self.ctx.symbol_table.add_symbol(node.identifier, self.ctx.current_type, func_value)
+        self.ctx.symbol_table.add_symbol(node.identifier, func_type, func_value)
 
         # 设置当前的值为函数符号值
         self.ctx.current_value = func_value
@@ -303,7 +330,40 @@ class CodeGenVisitor():
 
     @visitor.when(ast.StructDecl)
     def visit(self, node: ast.StructDecl):
-        pass
+        # 创建新的结构体类型
+        struct_type = Type(struct_name=node.identifier, 
+                           is_interface=False)
+
+        # 若结构体有泛型参数列表，解析该列表
+        for generics_type in node.generics_type_list:
+            generics_type.accept(self)
+            struct_type.add_generics_type(self.ctx.current_type)
+        # 对于有泛型参数的结构体，现在还无法解析其具体内容，保留到未解析节点中
+        if struct_type.has_generics():
+            struct_type.unfinished_node = node
+            self.ctx.current_type = struct_type
+            return
+
+        # 解析继承接口类型的列表
+        for base_type in node.base_type:
+            base_type.accept(self)
+            if self.ctx.current_type.get_kind() != TypeKind.INTERFACE:
+                raise SemanticError('base type of struct must be interface type')
+            struct_type.add_struct_base_type(self.ctx.current_type)
+
+        # 创建新符号表，进入结构体作用域
+        struct_type.add_symbol_table(self.ctx.symbol_table)
+        self.ctx.push_scope(struct_type.symbol_table, self.ctx.ir_builder, self.ctx.deduced_ret_type)
+
+        # 解析成员变量与成员函数
+        for member_decl in node.member_decl_list:
+            member_decl.accept(self)
+        for member_func in node.member_func_definition_list:
+            member_func.accept(self)
+
+        # 退出结构体作用域
+        self.ctx.pop_scope()
+        self.ctx.current_type = struct_type
 
     @visitor.when(ast.InterfaceDecl)
     def visit(self, node: ast.InterfaceDecl):
@@ -311,7 +371,10 @@ class CodeGenVisitor():
 
     @visitor.when(ast.MemberDecl)
     def visit(self, node: ast.MemberDecl):
-        pass
+        # 解析成员类型
+        node.type_spec.accept(self)
+        # 添加成员变量至符号表，此处无实际值
+        self.ctx.symbol_table.add_symbol(node.identifier, self.ctx.current_type)
 
     @visitor.when(ast.MemberFuncDecl)
     def visit(self, node: ast.MemberFuncDecl):
@@ -340,7 +403,8 @@ class CodeGenVisitor():
         self.ctx.push_scope(new_symbol_table, self.ctx.ir_builder, self.ctx.deduced_ret_type)
         for stmt in node.statement_list:
             stmt.accept(self)
-        self.ctx.pop_scope()
+        _, _, deduced_ret_type = self.ctx.pop_scope()
+        self.ctx.deduced_ret_type = self.ctx.deduced_ret_type or deduced_ret_type
 
     @visitor.when(ast.ExpressionStatement)
     def visit(self, node: ast.ExpressionStatement):
@@ -455,7 +519,13 @@ class CodeGenVisitor():
 
             # 如果未指定返回类型，推导表达式类型为该返回值类型
             if ret_type.get_kind() == TypeKind.AUTO:
-                self.ctx.deduced_ret_type = self.ctx.current_type
+                # 若当前是第一个return语句，记录解析的返回值类型
+                if self.ctx.deduced_ret_type is None:
+                    self.ctx.deduced_ret_type = self.ctx.current_type
+                # 否则检查两个return的表达式类型一致
+                else:
+                    if not (self.ctx.current_type == self.ctx.deduced_ret_type):
+                        raise SemanticError('multiple return expression with different types')
                 ret_value = self.ctx.current_value
             # 如果指定了返回类型，检验返回值是否可以转换为返回类型
             else:
@@ -466,8 +536,18 @@ class CodeGenVisitor():
 
             self.ctx.ir_builder.ret(ret_value)
         else:
+            # 如果未指定返回类型，推导表达式类型为VOID
+            if ret_type.get_kind() == TypeKind.AUTO:
+                # 若当前是第一个return语句，记录解析的返回值类型
+                if self.ctx.deduced_ret_type is None:
+                    self.ctx.deduced_ret_type = Type(basic_type=BasicType.VOID)
+                # 否则检查两个return的表达式类型一致
+                else:
+                    if not (self.ctx.current_type == self.ctx.deduced_ret_type):
+                        raise SemanticError('multiple return expression with different types')
+
             # 检查函数返回类型是否为void
-            if ret_type.get_kind() != TypeKind.BASIC or ret_type.basic_type != BasicType.VOID:
+            elif ret_type.get_kind() != TypeKind.BASIC or ret_type.basic_type != BasicType.VOID:
                 raise SemanticError('non-void function should return a value')
 
             self.ctx.ir_builder.ret_void()

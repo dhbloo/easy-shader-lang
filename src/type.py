@@ -9,6 +9,7 @@ from . import symbol
 
 
 class Type():
+    """表示一个ESL语言类型"""
     def __init__(self, 
                  basic_type : Optional[BasicType] = None,
                  generic_name : Optional[str] = None,
@@ -31,7 +32,7 @@ class Type():
         # Struct / Interface type
         self.struct_name : Optional[str] = struct_name
         self.is_interface : bool = is_interface
-        self.base_type : Optional[Type] = None
+        self.base_type_list : List[Type] = []
         self.member_list : List[symbol.Symbol] = []
 
         # Array type
@@ -85,7 +86,8 @@ class Type():
         return self
 
     def add_struct_base_type(self, base_type : Type) -> Type:
-        self.base_type = base_type
+        assert base_type.get_kind() == TypeKind.INTERFACE
+        self.base_type_list.append(base_type)
         return self
 
     def add_struct_member(self, member : symbol.Symbol) -> Type:
@@ -133,7 +135,7 @@ class Type():
                          struct_name=self.struct_name,
                          is_interface=self.is_interface)
         temp_type.is_const = self.is_const
-        temp_type.base_type = self.base_type
+        temp_type.base_type_list = [*self.base_type_list]
         temp_type.array_dims = [*self.array_dims]
         temp_type.reference = self.reference
         if self.func_params:
@@ -174,11 +176,13 @@ class Type():
 
         return False
 
-    def specialize(self, generics_spec_list : List[Type]) -> Type:
-        pass
+    def specialize(self, generic_specialization_list : List[Type]) -> Type:
+        raise NotImplementedError()
 
     def to_ir_type(self) -> ir.Type:
         kind = self.get_kind()
+        if kind == TypeKind.AUTO:
+            return ir.VoidType()
         if kind == TypeKind.BASIC:
             if self.basic_type == BasicType.VOID:
                 return ir.VoidType()

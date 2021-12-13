@@ -5,3 +5,7 @@ func inc_one(x : i32) -> i32 {
     let t : f32 = a;
     return x;
 }
+
+func deduce_ret_type(x : i64) {
+    return x;
+}

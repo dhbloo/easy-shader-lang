@@ -240,8 +240,8 @@ class StructDecl(TypeDeclaration):
         self.identifier = identifier
         self.generics_type_list = generics_type_list
         self.base_type = base_type
-        self.member_decl_list = []
-        self.member_func_definition_list = []
+        self.member_decl_list : List[MemberDecl] = []
+        self.member_func_definition_list : List[MemberFuncDefinition] = []
         for member in member_list:
             self.add_member(member)
 
