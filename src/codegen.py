@@ -12,9 +12,9 @@ class SemanticError(RuntimeError):
         
 
 class CodeGenContext():
-    def __init__(self, file_name) -> None:
+    def __init__(self, module_name) -> None:
         super().__init__(self)
-        self.module = ir.Module(name=file_name)
+        self.module = ir.Module(name=module_name)
         self.visitor = CodeGenVisitor(self)
 
         self.scope_stack : List[Tuple[SymbolTable, ir.IRBuilder, Type]] = []

@@ -1,0 +1,2 @@
+let a : i32 = 1;    # int
+let b : f64 = 1.0;  # double
