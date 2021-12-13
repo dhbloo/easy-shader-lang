@@ -46,3 +46,14 @@ class BinaryOp(Enum):
 class IOType(Enum):
     IN = 0
     OUT = 1
+
+
+class TypeKind(Enum):
+    AUTO = 0,
+    BASIC = 1,
+    GENERIC = 2,
+    STRUCT = 3,
+    INTERFACE = 4,
+    ARRAY = 5,
+    REFERENCE = 6,
+    FUNCTION = 7

@@ -1,0 +1,25 @@
+struct CentiMeter <T>;
+
+struct Meter <T> {
+    length : T;
+    func Meter(self, l : T) {
+        self.length = l
+    }
+    func CentiMeter<T>(self) {
+        return CentiMeter<T>(self.length * 100);
+    }
+}
+
+struct CentiMeter <T> {
+    length : T;
+    func CentiMeter (self, l : T) {
+        self.length = l
+    }
+    func Meter<T>(self) {
+        return Meter<T>(self.length / 100);
+    }
+}
+
+convert(Meter<T> -> CentiMeter<T>) <T>(m : Meter<T>) {
+    return CentiMeter<T>(m.length * 100);
+}

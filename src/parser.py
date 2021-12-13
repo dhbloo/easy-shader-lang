@@ -454,7 +454,6 @@ def p_operand(p):
                | HEXADECIMAL
                | FLOAT
                | DOUBLE
-               | STRING
                | ID
                | LPAREN expression RPAREN'''
     # print('operand', p[1])

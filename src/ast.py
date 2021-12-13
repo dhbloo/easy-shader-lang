@@ -32,12 +32,11 @@ class Node():
 ###########################################################
 
 class TranslationUnit(Node):
-    def __init__(self, loc, decl_list : List[BlockDeclaration | FunctionDecl] = []) -> None:
+    def __init__(self, loc) -> None:
         super().__init__(loc)
-        self.block_declaration_list = []
-        self.func_definition_list = []
-        for decl in decl_list:
-            self.add_declaration(decl)
+        self.declaration_list : List[Node] = []
+        self.block_declaration_list : List[BlockDeclaration] = []
+        self.func_definition_list : List[FunctionDefinition] = []
 
     def add_declaration(self, decl):
         if isinstance(decl, BlockDeclaration):
@@ -46,6 +45,7 @@ class TranslationUnit(Node):
             self.func_definition_list.insert(0, decl)
         else:
             raise TypeError(f'unknown declaration type {type(decl)}')
+        self.declaration_list.insert(0, decl)
 
     def __str__(self, ind=Indent()) -> str:
         out = 'Translation Unit:\n'
@@ -70,18 +70,6 @@ class TypeAliasDecl(TypeDeclaration):
     def __str__(self, ind=Indent()) -> str:
         return f'{ind}Type Alias:\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n'
 
-class Declarator(Node):
-    def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier], init_expr : Expression) -> None:
-        super().__init__(loc)
-        self.identifier = identifier
-        self.type_spec = type_spec
-        self.init_expr = init_expr
-        self.is_const = False
-
-    def __str__(self, ind=Indent()) -> str:
-        const = '(const)' if self.is_const else ' '
-        return f'{ind}Declarator: {const}\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2) if self.type_spec else "(empty)"}\n{ind+1}Initializer:\n{self.init_expr.__str__(ind+2)}'
-
 class VariableDecl(BlockDeclaration):
     def __init__(self, loc, declarator_list : List[Declarator], is_const : bool) -> None:
         super().__init__(loc)
@@ -95,6 +83,18 @@ class VariableDecl(BlockDeclaration):
         for decl in self.declarator_list:
             out += decl.__str__(ind+1)
         return out
+
+class Declarator(Node):
+    def __init__(self, loc, identifier, type_spec : Optional[TypeSpecifier], init_expr : Expression) -> None:
+        super().__init__(loc)
+        self.identifier = identifier
+        self.type_spec = type_spec
+        self.init_expr = init_expr
+        self.is_const = False
+
+    def __str__(self, ind=Indent()) -> str:
+        const = '(const)' if self.is_const else ' '
+        return f'{ind}Declarator: {const}\n{ind+1}ID: {self.identifier}\n{ind+1}Type: {self.type_spec.__str__(ind+2) if self.type_spec else "(empty)"}\n{ind+1}Initializer:\n{self.init_expr.__str__(ind+2)}'
 
 class FunctionDefinition(Node):
     def __init__(self, loc, func_decl : FunctionDecl, block_stmt : BlockStatement) -> None:
@@ -148,7 +148,6 @@ class GenericType(TypeSpecifier):
 
     def __str__(self, ind=Indent()) -> str:
         return f'GenericType({self.type})'
-
 
 class ArrayType(TypeSpecifier):
     def __init__(self, loc, type : TypeSpecifier, size : Optional[int]) -> None:
@@ -358,12 +357,12 @@ class BlockStatement(Statement):
         return out
 
 class ExpressionStatement(Statement):
-    def __init__(self, loc, expression : Expression) -> None:
+    def __init__(self, loc, expression : Optional[Expression]) -> None:
         super().__init__(loc)
         self.expression = expression
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Expression Statement:\n{self.expression.__str__(ind+1)}'
+        return f'{ind}Expression Statement:\n{self.expression.__str__(ind+1) if self.expression else ""}'
 
 class IfStatement(Statement):
     def __init__(self, loc, condition : Expression, true_stmt : Statement, false_stmt : Optional[Statement] = None) -> None:
@@ -478,9 +477,10 @@ class Operand(PrimaryExpression):
     pass
 
 class LiteralOperand(Operand):
-    def __init__(self, loc, literal) -> None:
+    def __init__(self, loc, literal, is_float=False) -> None:
         super().__init__(loc)
         self.literal = literal
+        self.is_float = is_float
 
     def __str__(self, ind=Indent()) -> str:
         return f'{ind}Literal: ({type(self.literal)}) {self.literal}\n'

@@ -1,0 +1,11 @@
+let a : i32[32] = i32[32]();
+let b : i32[32] ref = a;
+let c : i32 ref[32] = a;      # not supported
+let d : i32[32] ref ref = b;  # not supported
+
+struct Node {
+    data : i32;
+    parent : Node ref;
+    left_child : Node ref;
+    right_child : Node ref;
+};
