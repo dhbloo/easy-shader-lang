@@ -7,6 +7,7 @@ from .symbol import SymbolTable, Type
 from .error import SemanticError
 from . import ast
      
+I_BASICTYPES = [BasicType.I8.value, BasicType.I16.value, BasicType.I32.value, BasicType.I64.value]
 
 class CodeGenContext():
     def __init__(self, module_name) -> None:
@@ -73,9 +74,8 @@ class CodeGenContext():
             is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
             is_float = lambda bt: bt.value >= BasicType.F16.value
             if (is_integer(src_bt) or src_bt == BasicType.BOOL) and is_integer(dst_bt):
-                i_bts = [BasicType.I8.value, BasicType.I16.value, BasicType.I32.value, BasicType.I64.value]
-                is_i_src = src_bt.value in i_bts
-                is_i_dst = dst_bt.value in i_bts
+                is_i_src = src_bt.value in I_BASICTYPES
+                is_i_dst = dst_bt.value in I_BASICTYPES
                 # u->i 0扩展 u->i 0扩展 i->i 符号扩展
                 if (not is_i_src) and (src_bt.value < dst_bt.value):
                     return True, self.ir_builder.zext(src_value, dst_type.to_ir_type())
@@ -88,7 +88,20 @@ class CodeGenContext():
                     return True, self.ir_builder.fpext(src_value, dst_type.to_ir_type())
             return False, None
 
-        raise NotImplementedError()
+        return False, None
+
+    def get_current_assignment_value(self, node : ast.Node) -> Tuple[Type, ir.Value]:
+        type, value = self.current_type, self.current_value
+        assert type and value
+
+        # 处理非显式引用 (左值转右值)
+        if not isinstance(node, ast.RefExpression) and type.get_kind() == TypeKind.REFERENCE:
+            dst_type = type.clone().remove_ref()
+            _, value = self.convert_type(type, dst_type, value)
+        else:
+            dst_type = type
+        
+        return dst_type, value
 
     def get_module(self) -> ir.Module:
         return self.module
@@ -128,11 +141,11 @@ class CodeGenVisitor():
 
         # 解析表达式
         node.init_expr.accept(self)
-        if var_type is None:
-            var_type = self.ctx.current_type
+        var_init_type, var_value = self.ctx.get_current_assignment_value(node.init_expr)
+        var_type = var_type or var_init_type
 
         # 初始化表达式类型转换
-        cvt_success, var_value = self.ctx.convert_type(self.ctx.current_type, var_type, self.ctx.current_value)
+        cvt_success, var_value = self.ctx.convert_type(var_init_type, var_type, var_value)
         if not cvt_success:
             raise SemanticError(f'{self.ctx.current_type} is not convertible to {var_type}')
 
@@ -145,7 +158,11 @@ class CodeGenVisitor():
         # 2. 对于局部变量，在栈上分配空间，直接在当前context的ir_builder中加入初始化表达式
         if self.ctx.symbol_table.is_root():
             global_value = ir.GlobalVariable(self.ctx.module, var_type.to_ir_type(), node.identifier)
-            global_value.initializer = var_value
+            # 根据初始化表达式是否为常数选择init方式
+            if isinstance(var_value, ir.Constant):
+                global_value.initializer = var_value
+            else:
+                self.ctx.ir_builder.store(var_value, global_value)
             global_value.global_constant = var_type.is_const
             self.ctx.symbol_table.add_symbol(node.identifier, var_type, global_value)
             self.ctx.current_value = global_value
@@ -186,7 +203,8 @@ class CodeGenVisitor():
                     new_func_type.return_type = self.ctx.deduced_ret_type.to_ir_type()
                     # 重新构建函数值
                     new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
-                    new_func_value.basic_blocks.append(entry_block)
+                    for block in func_value.blocks:
+                        new_func_value.basic_blocks.append(block)
                     # 替换符号表中的符号
                     func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
                     func_symbol.value = new_func_value
@@ -418,20 +436,34 @@ class CodeGenVisitor():
             raise SemanticError('condition is not convertible to bool')
 
         # 生成If-Else基本块
-        with self.ctx.ir_builder.if_else(cond_value) as (then, otherwise):
-            with then:
-                node.true_stmt.accept(self)
-            with otherwise:
-                if node.false_stmt:
-                    node.false_stmt.accept(self)
+        func : ir.Function = self.ctx.ir_builder.function
+        then_block = func.append_basic_block('if.then')
+        else_block = func.append_basic_block('if.else')
+        end_block = func.append_basic_block('if.endif')
+        self.ctx.ir_builder.cbranch(cond_value, then_block, else_block)
+
+        # 解析True时的语句
+        self.ctx.ir_builder.position_at_start(then_block)
+        node.true_stmt.accept(self)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(end_block)
+
+        # 解析False时的语句
+        self.ctx.ir_builder.position_at_start(else_block)
+        node.false_stmt.accept(self)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(end_block)
+
+        # 设置插入点至if之后
+        self.ctx.ir_builder.position_at_start(end_block)
 
     @visitor.when(ast.WhileStatement)
     def visit(self, node: ast.WhileStatement):
         # 创建While基本块
-        func = self.ctx.ir_builder.function
-        cond_block = ir.Block(func, 'while.cond')
-        loop_block = ir.Block(func, 'while.loop')
-        end_block = ir.Block(func, 'while.end')
+        func : ir.Function = self.ctx.ir_builder.function
+        cond_block = func.append_basic_block('while.cond')
+        loop_block = func.append_basic_block('while.loop')
+        end_block = func.append_basic_block('while.end')
         self.ctx.ir_builder.branch(cond_block)
 
         # 解析WHITE条件表达式
@@ -461,10 +493,10 @@ class CodeGenVisitor():
         node.init_stmt.accept(self)
 
         # 创建For基本块
-        func = self.ctx.ir_builder.function
-        cond_block = ir.Block(func, 'for.cond')
-        loop_block = ir.Block(func, 'for.loop')
-        end_block = ir.Block(func, 'for.end')
+        func : ir.Function = self.ctx.ir_builder.function
+        cond_block = func.append_basic_block('for.cond')
+        loop_block = func.append_basic_block('for.loop')
+        end_block = func.append_basic_block('for.end')
         self.ctx.ir_builder.branch(cond_block)
 
         # 解析For条件表达式
@@ -512,15 +544,7 @@ class CodeGenVisitor():
 
             # 解析返回值表达式
             node.expression.accept(self)
-            ret_value = self.ctx.current_value
-
-            # 处理非显式引用 (左值转右值)
-            if (not isinstance(node.expression, ast.RefExpression) 
-                and self.ctx.current_type.get_kind() == TypeKind.REFERENCE):
-                ret_value_type = self.ctx.current_type.clone().remove_ref()
-                _, ret_value = self.ctx.convert_type(self.ctx.current_type, ret_value_type, ret_value)
-            else:
-                ret_value_type = self.ctx.current_type
+            ret_value_type, ret_value = self.ctx.get_current_assignment_value(node.expression)
 
             # 如果未指定返回类型，推导表达式类型为该返回值类型
             if ret_type.get_kind() == TypeKind.AUTO:
@@ -561,17 +585,17 @@ class CodeGenVisitor():
         lhs_type, lhs_value = self.ctx.current_type, self.ctx.current_value
 
         # 检测左表达式是可修改的引用类型（左值）
-        if lhs_type.get_kind() != TypeKind.REFERENCE:
-            raise SemanticError('can not assign to a r-value')
         if lhs_type.is_const:
             raise SemanticError('can not assign to const variable')
+        if lhs_type.get_kind() != TypeKind.REFERENCE:
+            raise SemanticError('can not assign to a r-value')
 
         # 解析右表达式
         node.rhs_expr.accept(self)
-        rhs_type, rhs_value = self.ctx.current_type, self.ctx.current_value
+        rhs_type, rhs_value = self.ctx.get_current_assignment_value(node.rhs_expr)
 
         # 若右表达式类型为显式引用，要求左表达式也为一个引用类型的标识符
-        if isinstance(node.rhs_expr, ast.RefExpression):
+        if rhs_type.get_kind() == TypeKind.REFERENCE:
             if not isinstance(node.lhs_expr, ast.IdentifierOperand):
                 raise SemanticError('can not assign reference to non identifier operand')
         
@@ -580,7 +604,7 @@ class CodeGenVisitor():
             # 检查符号类型是引用
             if symbol.type.get_kind() != TypeKind.REFERENCE:
                 raise SemanticError('can not assign reference to a non reference identifier')
-            
+
             # 检查左右表达式的类型相同
             if lhs_type != rhs_type:
                 raise SemanticError('can not assign reference to a different type')
@@ -589,15 +613,14 @@ class CodeGenVisitor():
             self.ctx.ir_builder.store(rhs_value, symbol.value)
         # 否则进行普通赋值
         else:
-            # 检查右侧类型可以被转换到左侧类型去除引用后的值类型
+            # 检查左右表达式的类型相同
             lhs_value_type = lhs_type.clone().remove_ref()
             cvt_success, rhs_value = self.ctx.convert_type(rhs_type, lhs_value_type, rhs_value)
             if not cvt_success:
-                raise SemanticError('can not assign value to target type')
+                raise SemanticError('can not convert expression type to variable type')
 
             # 储存值到变量中
             self.ctx.ir_builder.store(rhs_value, lhs_value)
-        pass
 
     @visitor.when(ast.BinaryExpression)
     def visit(self, node: ast.BinaryExpression):
@@ -627,12 +650,13 @@ class CodeGenVisitor():
             raise SemanticError(f'unsupported type of binary operands')
 
         # 生成运算指令
-        irb = self.ctx.ir_builder
+        self.ctx.current_type = lhs_type
         basic_type = lhs_type.basic_type
+        irb = self.ctx.ir_builder
         is_bool = basic_type == BasicType.BOOL
         is_float = basic_type == BasicType.F16 or basic_type == BasicType.F32 or basic_type == BasicType.F64
         is_integer = not is_bool and not is_float
-        s_int_type = [2, 4, 6, 8]  # 符号整型的枚举值
+        cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed
         '''binary_expr : expression PLUS expression
                            | expression MINUS expression
                            | expression MUL expression
@@ -652,7 +676,6 @@ class CodeGenVisitor():
                            | expression GREATER_EQUAL expression
                            | expression GREATER expression'''
         if node.operator == BinaryOp.PLUS:  # +
-            print('node.operator', node.operator)
             if is_bool:
                 raise SemanticError('can not do PLUS to bool type')
             value = (irb.fadd if is_float else irb.add)(lhs_value, rhs_value)
@@ -670,7 +693,7 @@ class CodeGenVisitor():
             if is_float:
                 value = irb.fdiv(lhs_value, rhs_value)
             elif is_integer:
-                if basic_type.value in s_int_type:
+                if basic_type.value in I_BASICTYPES:
                     value = irb.sdiv(lhs_value, rhs_value)
                 else:
                     value = irb.udiv(lhs_value, rhs_value)
@@ -691,7 +714,7 @@ class CodeGenVisitor():
                 raise SemanticError('unsupported type of XOR')
         elif node.operator == BinaryOp.MOD:  # %
             if is_integer:
-                if basic_type.value in s_int_type:
+                if basic_type.value in I_BASICTYPES:
                     value = irb.srem(lhs_value, rhs_value)
                 else:
                     value = irb.urem(lhs_value, rhs_value)
@@ -722,21 +745,27 @@ class CodeGenVisitor():
             else:
                 raise SemanticError('unsupported type of LOGICAL_AND')
         elif node.operator == BinaryOp.NOT_EQUAL:  # !=
-            value = self.ctx.ir_builder.icmp_signed('!=', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('!=', lhs_value, rhs_value)
         elif node.operator == BinaryOp.EQUAL:  # ==
-            value = self.ctx.ir_builder.icmp_signed('==', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('==', lhs_value, rhs_value)
         elif node.operator == BinaryOp.LESS_EQUAL:  # <=
-            value = self.ctx.ir_builder.icmp_signed('<=', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('<=', lhs_value, rhs_value)
         elif node.operator == BinaryOp.LESS:  # <
-            value = self.ctx.ir_builder.icmp_signed('<', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('<', lhs_value, rhs_value)
         elif node.operator == BinaryOp.GREATER_EQUAL:  # >=
-            value = self.ctx.ir_builder.icmp_signed('>=', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('>=', lhs_value, rhs_value)
         elif node.operator == BinaryOp.GREATER:  # >
-            value = self.ctx.ir_builder.icmp_signed('>', lhs_value, rhs_value)
+            self.ctx.current_type = Type(basic_type=BasicType.BOOL)
+            value = cmp_instr('>', lhs_value, rhs_value)
         else:
             raise NotImplementedError(f'binary op {node.operator} not implemented')
         self.ctx.current_value = value
-        self.ctx.current_type = lhs_type
+        
 
     @visitor.when(ast.UnaryExpression)
     def visit(self, node: ast.UnaryExpression):
@@ -876,6 +905,8 @@ class CodeGenVisitor():
             return
 
         # 否则使用尝试使用强制转换规则
+        # 1. 向下转换: i64 -> i32 -> i16 -> i8, f64 -> f32 -> f16
+        # 2. 浮点与(整数,bool)互相转换: iX <-> fX, bool <-> fX
         raise NotImplementedError()
 
     @visitor.when(ast.NewExpression)

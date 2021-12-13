@@ -1,14 +1,9 @@
-let a : f32 = 1.0f;    # int
-let b : f64 = 1.0;  # double
+let a : f32 = 1.0f; # int
+const b : f64 = 1.0;  # double
 
 func inc_one(x : i32) -> i32 {
-    let t : f32 = a;
-    let f : bool = 0;
-    let g : bool = 0;
-    let h : bool = !(f && g);
-    return x + (i32)h;
+    return x + 1;
 }
-
 
 let c : bool = 1;
 let d : bool = 1;
@@ -19,5 +14,31 @@ let g : i32 = 1;
 let h : i32 = f + g;
 
 func deduce_ret_type(x : i64) {
-    return x;
+    f = g = 1;
+    return x + (i64)(f * 2 / g);
+}
+
+func reference_test(x : i32, xp : i32 ref, yp : i32 ref) -> i32 ref {
+    xp = x + 1;
+    x = xp + 1;
+    xp = ref(yp);
+    xp = yp;
+    return ref(xp);
+}
+
+func max(x : f32, y : f32) {
+    if (y > x)
+        return y;
+    else
+        return x;
+}
+
+func sum_while(start : i32, end : i32, step : i32) -> i32 {
+    let x = start;
+    let sum = 0;
+    while (x <= end) {
+        x = x + step;
+        sum = sum + x;
+    }
+    return sum;
 }

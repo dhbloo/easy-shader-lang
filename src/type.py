@@ -220,3 +220,6 @@ class Type():
             return ir.FunctionType(ret_ir_type, param_ir_types)
         else:
             assert False, "uninstantiabled type!"
+
+    def __str__(self) -> str:
+        return str(self.get_kind())

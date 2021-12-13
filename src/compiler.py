@@ -9,26 +9,32 @@ parser = create_parser()
 
 class Compiler():
     def __init__(self, ast_only=False):
-        self.ast_only = ast_only
-        self.codegen_ctx = None
-        self.error_message = None
+        self.ast_only : bool = ast_only
+        self.codegen_ctx : CodeGenContext = None
+        self.ast_root : ast.TranslationUnit = None
+        self.error_message : str = None
 
     def compile(self, code_str, module_name) -> bool:
-        ast_root : ast.TranslationUnit = parser.parse(code_str)
+        self.ast_root = parser.parse(code_str)
         if self.ast_only:
-            return ast_root
+            return True
 
         self.codegen_ctx = CodeGenContext(module_name)
         try:
-            ast_root.accept(self.codegen_ctx.visitor)
+            self.ast_root.accept(self.codegen_ctx.visitor)
         except SemanticError as err:
             self.error_message = str(err)
-            print('error_message', self.error_message)
             return False
 
         return True
 
-    def dump_text(self, out_stream : TextIOBase) -> None:
+    def get_error_message(self):
+        return self.error_message
+
+    def dump_ast(self, out_stream : TextIOBase):
+        out_stream.write(str(self.ast_root))
+
+    def dump_text(self, out_stream : TextIOBase):
         out_stream.write(str(self.codegen_ctx.get_module()))
 
         
