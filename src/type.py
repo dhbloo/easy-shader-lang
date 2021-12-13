@@ -50,7 +50,7 @@ class Type():
         self.unfinished_node : Optional[Node] = None
 
     def get_kind(self) -> TypeKind:
-        if self.func_params:
+        if self.func_params is not None:
             return TypeKind.FUNCTION
         elif self.reference:
             return TypeKind.REFERENCE
@@ -138,7 +138,7 @@ class Type():
         temp_type.base_type_list = [*self.base_type_list]
         temp_type.array_dims = [*self.array_dims]
         temp_type.reference = self.reference
-        if self.func_params:
+        if self.func_params is not None:
             temp_type.func_params = [*self.func_params]
         temp_type.generics_type_list = [*self.generics_type_list]
         temp_type.symbol_table = self.symbol_table

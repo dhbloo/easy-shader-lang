@@ -42,3 +42,8 @@ func sum_while(start : i32, end : i32, step : i32) -> i32 {
     }
     return sum;
 }
+
+func const_test() {
+    const a = 1;
+    # a = 2;
+}

@@ -196,18 +196,18 @@ class CodeGenVisitor():
 
             # 若该函数声明省略了返回值类型，推导其为返回表达式的类型
             if func_type.clone().to_return_type().get_kind() == TypeKind.AUTO:
-                # 如果没有出现返回值语句，默认为VOID返回值
-                if self.ctx.deduced_ret_type:
-                    # 替换返回值类型得到新函数类型
-                    new_func_type = func_value.function_type
-                    new_func_type.return_type = self.ctx.deduced_ret_type.to_ir_type()
-                    # 重新构建函数值
-                    new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
-                    for block in func_value.blocks:
-                        new_func_value.basic_blocks.append(block)
-                    # 替换符号表中的符号
-                    func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
-                    func_symbol.value = new_func_value
+                # 若没有返回语句，返回类型为VOID
+                deduced_ret_type = self.ctx.deduced_ret_type or Type(basic_type=BasicType.VOID)
+                # 替换返回值类型得到新函数类型
+                new_func_type = func_value.function_type
+                new_func_type.return_type = deduced_ret_type.to_ir_type()
+                # 重新构建函数值
+                new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
+                for block in func_value.blocks:
+                    new_func_value.basic_blocks.append(block)
+                # 替换符号表中的符号
+                func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
+                func_symbol.value = new_func_value
 
             self.ctx.pop_scope()
         # 否则此函数为泛型函数，记录未解析节点至函数类型中
