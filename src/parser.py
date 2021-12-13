@@ -426,6 +426,7 @@ def p_binary_expr(p):
 # ++ --
 def p_unary_expr(p):
     '''unary_expr : unary_operation primary_expr '''
+    print(p.slice[1].type)
     p[0] = ast.UnaryExpression(p.lineno(1), p[2], p[1])
 
 # 单目
@@ -435,7 +436,7 @@ def p_unary_opration_opt(p):
                            | PLUS %prec UPLUS
                            | MINUS %prec UMINUS'''
     if p[1]:
-        p[0] = p[1]
+        p[0] = UnaryOp[p.slice[1].type]
 
 def p_primary_expr(p):
     '''primary_expr : operand
@@ -458,7 +459,7 @@ def p_operand(p):
                | LPAREN expression RPAREN'''
     # print('operand', p[1])
     # print(p.lineno(1), p.slice[1].type)
-    if len(p) == '(':
+    if p[1] == '(':
         p[0] = ast.ExpressionOperand(p.lineno(1), p[2])
     elif p.slice[1].type == 'ID':
         p[0] = ast.IdentifierOperand(p.lineno(1), p[1])

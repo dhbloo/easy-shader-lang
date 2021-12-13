@@ -3,5 +3,16 @@ let b : f64 = 1.0;  # double
 
 func inc_one(x : i32) -> i32 {
     let t : f32 = a;
+    let f : bool = 0;
+    let g : bool = 0;
+    let h : bool = !(f && g);
     return x;
 }
+
+#let c : bool = 1;
+#let d : bool = 1;
+#let e : bool = c || d;
+
+#let f : i32 = 1;
+#let g : i32 = 1;
+#let h : i32 = f + g;

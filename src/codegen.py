@@ -74,7 +74,7 @@ class CodeGenContext():
             if is_integer(src_bt) and is_integer(dst_bt):
                 is_i_src = src_bt.value in [2, 4, 6, 8]
                 is_i_dst = dst_bt.value in [2, 4, 6, 8]
-                # u->i 0扩展 u->i 0扩展 i->i符号扩展
+                # u->i 0扩展 u->i 0扩展 i->i 符号扩展
                 if (not is_i_src) and (src_bt.value < dst_bt.value):
                     src_value = self.ir_builder.zext(src_value, dst_type.to_ir_type())
                 elif is_i_src and is_i_dst and (src_bt.value < dst_bt.value):
@@ -83,7 +83,7 @@ class CodeGenContext():
                     return False, None
                 return True, src_value
             elif is_integer(src_bt) and dst_bt == BasicType.BOOL:
-                res = self.ir_builder.icmp_signed('nq', src_value, src_value.type(0))
+                res = self.ir_builder.icmp_signed('!=', src_value, src_value.type(0))  # src_value.type(0)获取本类型的0
                 return True, res
             elif is_float(src_bt) and is_float(dst_bt):
                 if src_bt.value <= dst_bt.value:
@@ -527,6 +527,16 @@ class CodeGenVisitor():
         node.rhs_expr.accept(self)
         rhs_type, rhs_value = self.ctx.current_type, self.ctx.current_value
 
+        if (lhs_type.get_kind() == TypeKind.REFERENCE):
+            lhs_value_type = lhs_type.clone().remove_ref()
+            _, lhs_value = self.ctx.convert_type(lhs_type, lhs_value_type, lhs_value)
+            lhs_type = lhs_value_type
+
+        if (rhs_type.get_kind() == TypeKind.REFERENCE):
+            rhs_value_type = rhs_type.clone().remove_ref()
+            _, rhs_value = self.ctx.convert_type(rhs_type, rhs_value_type, rhs_value)
+            rhs_type = rhs_value_type
+
         # 检查左右表达式类型一致
         if not lhs_type == rhs_type:
             raise SemanticError(f'type of binary operands are not the same')
@@ -540,11 +550,108 @@ class CodeGenVisitor():
         is_bool = basic_type == BasicType.BOOL
         is_float = basic_type == BasicType.F16 or basic_type == BasicType.F32 or basic_type == BasicType.F64
         is_integer = not is_bool and not is_float
-
-        if node.operator == BinaryOp.PLUS:
+        s_int_type = [2, 4, 6, 8]  # 符号整型的枚举值
+        '''binary_expr : expression PLUS expression
+                           | expression MINUS expression
+                           | expression MUL expression
+                           | expression DIV expression
+                           | expression AND expression
+                           | expression OR expression
+                           | expression XOR expression
+                           | expression MOD expression
+                           | expression LSHIFT expression
+                           | expression RSHIFT expression
+                           | expression LOGICAL_OR expression
+                           | expression LOGICAL_AND expression
+                           | expression NOT_EQUAL expression
+                           | expression EQUAL expression
+                           | expression LESS_EQUAL expression
+                           | expression LESS expression
+                           | expression GREATER_EQUAL expression
+                           | expression GREATER expression'''
+        if node.operator == BinaryOp.PLUS:  # +
+            print('node.operator', node.operator)
+            if is_bool:
+                raise SemanticError('can not do PLUS to bool type')
             value = (irb.fadd if is_float else irb.add)(lhs_value, rhs_value)
-        elif node.operator == BinaryOp.MINUS:
+        elif node.operator == BinaryOp.MINUS:  # -
+            if is_bool:
+                raise SemanticError('can not do MINUS to bool type')
             value = (irb.fsub if is_float else irb.sub)(lhs_value, rhs_value)
+        elif node.operator == BinaryOp.MUL:  # *
+            if is_bool:
+                raise SemanticError('can not do MUL to bool type')
+            value = (irb.fmul if is_float else irb.mul)(lhs_value, rhs_value)
+        elif node.operator == BinaryOp.DIV:  # /
+            if is_bool:
+                raise SemanticError('can not do DIV to bool type')
+            if is_float:
+                value = irb.fdiv(lhs_value, rhs_value)
+            elif is_integer:
+                if basic_type.value in s_int_type:
+                    value = irb.sdiv(lhs_value, rhs_value)
+                else:
+                    value = irb.udiv(lhs_value, rhs_value)
+        elif node.operator == BinaryOp.AND:  # &
+            if is_integer:
+                value = irb.and_((lhs_value, rhs_value))
+            else:
+                raise SemanticError('unsupported type of AND')
+        elif node.operator == BinaryOp.OR:  # |
+            if is_integer:
+                value = irb.or_((lhs_value, rhs_value))
+            else:
+                raise SemanticError('unsupported type of OR')
+        elif node.operator == BinaryOp.XOR:  # ^
+            if is_integer:
+                value = irb.xor((lhs_value, rhs_value))
+            else:
+                raise SemanticError('unsupported type of XOR')
+        elif node.operator == BinaryOp.MOD:  # %
+            if is_integer:
+                if basic_type.value in s_int_type:
+                    value = irb.srem(lhs_value, rhs_value)
+                else:
+                    value = irb.urem(lhs_value, rhs_value)
+            else:
+                raise SemanticError('unsupported type of MOD')
+        elif node.operator == BinaryOp.LSHIFT:  # <<
+            if is_integer:
+                value = irb.shl(lhs_value, rhs_value)
+            else:
+                raise SemanticError('unsupported type of LSHIFT')
+        elif node.operator == BinaryOp.RSHIFT:  # >>
+            if is_integer:
+                value = irb.ashr(lhs_value, rhs_value)
+            else:
+                raise SemanticError('unsupported type of RSHIFT')
+        elif node.operator == BinaryOp.LOGICAL_OR:  # or
+            if is_bool or is_integer:
+                _, lhs_value = self.ctx.convert_type(lhs_type, Type(basic_type=BasicType.BOOL), lhs_value)
+                _, rhs_value = self.ctx.convert_type(rhs_type, Type(basic_type=BasicType.BOOL), rhs_value)
+                value = self.ctx.ir_builder.or_(lhs_value, rhs_value)
+            else:
+                raise SemanticError('unsupported type of LOGICAL_OR')
+        elif node.operator == BinaryOp.LOGICAL_AND:  # and
+            if is_bool or is_integer:
+                _, lhs_value = self.ctx.convert_type(lhs_type, Type(basic_type=BasicType.BOOL), lhs_value)
+                _, rhs_value = self.ctx.convert_type(rhs_type, Type(basic_type=BasicType.BOOL), rhs_value)
+                value = self.ctx.ir_builder.and_(lhs_value, rhs_value)
+            else:
+                raise SemanticError('unsupported type of LOGICAL_AND')
+        elif node.operator == BinaryOp.NOT_EQUAL:  # !=
+            value = self.ctx.ir_builder.icmp_signed('!=', lhs_value, rhs_value)
+        elif node.operator == BinaryOp.EQUAL:  # ==
+            print('aaa')
+            value = self.ctx.ir_builder.icmp_signed('==', lhs_value, rhs_value)
+        elif node.operator == BinaryOp.LESS_EQUAL:  # <=
+            value = self.ctx.ir_builder.icmp_signed('<=', lhs_value, rhs_value)
+        elif node.operator == BinaryOp.LESS:  # <
+            value = self.ctx.ir_builder.icmp_signed('<', lhs_value, rhs_value)
+        elif node.operator == BinaryOp.GREATER_EQUAL:  # >=
+            value = self.ctx.ir_builder.icmp_signed('>=', lhs_value, rhs_value)
+        elif node.operator == BinaryOp.GREATER:  # >
+            value = self.ctx.ir_builder.icmp_signed('>', lhs_value, rhs_value)
         else:
             raise NotImplementedError(f'binary op {node.operator} not implemented')
         self.ctx.current_value = value
@@ -555,7 +662,12 @@ class CodeGenVisitor():
         # 解析表达式
         node.expression.accept(self)
         type, value = self.ctx.current_type, self.ctx.current_value
-
+        if (type.get_kind() == TypeKind.REFERENCE):
+            value_type = type.clone().remove_ref()
+            _, lhs_value = self.ctx.convert_type(type, value_type, value)
+            type = value_type
+        print(type.get_kind())
+        print(node.operator)
         # 检查操作数类型可运算（整形或浮点型）
         if type.get_kind() != TypeKind.BASIC:
             raise SemanticError(f'unsupported type of unary operands')
@@ -570,11 +682,21 @@ class CodeGenVisitor():
         if node.operator == UnaryOp.PLUS:
             pass
         elif node.operator == UnaryOp.MINUS:
-            value = irb.neg(value)
+            if is_integer:
+                value = irb.neg(value)
+            elif is_float:
+                value = irb.fneg(value)
+            else:
+                raise SemanticError('unsupported type for unary not')
         elif node.operator == UnaryOp.NOT:
             if is_float:
                 raise SemanticError('unsupported type for unary not')
             value = irb.not_(value)
+        elif node.operator == UnaryOp.LOGICAL_NOT:
+            if is_bool or is_integer:
+                value = self.ctx.ir_builder.icmp_signed('==', value, value.type(0))
+            else:
+                raise SemanticError('unsupported type for unary not')
         else:
             raise NotImplementedError(f'binary op {node.operator} not implemented')
         self.ctx.current_value = value
