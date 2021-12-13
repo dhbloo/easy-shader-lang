@@ -83,7 +83,6 @@ tokens = [
     'DOT',              # .
     'SEMICOLON',        # ;
     'GENERICMARK',      # '
-    'COMMENT',          # #
 ]
 
 # 保留字
@@ -211,6 +210,8 @@ def t_newline(t):
 
 # 保存忽略字符，空格等
 t_ignore = ' \t'
+# 注释
+t_ignore_COMMENT = r'\#.*'
 
 
 # 错误处理规则
@@ -218,10 +219,6 @@ def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
 
-# 注释
-def t_COMMENT(t):
-    r'\#.*'
-    pass
 
 def create_lexer():
     return lex.lex()
