@@ -426,7 +426,6 @@ def p_binary_expr(p):
 # ++ --
 def p_unary_expr(p):
     '''unary_expr : unary_operation primary_expr '''
-    print(p.slice[1].type)
     p[0] = ast.UnaryExpression(p.lineno(1), p[2], p[1])
 
 # 单目

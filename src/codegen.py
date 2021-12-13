@@ -66,34 +66,27 @@ class CodeGenContext():
             return self.convert_type(src_val_type, dst_type, src_value)
 
         # 基本类型转换
-        # 1. 向上转换: i8 -> i16 -> i32 -> i64, f16 -> f32 -> f64
+        # 1. 向上转换: bool -> i8 -> i16 -> i32 -> i64, f16 -> f32 -> f64
         # 2. 整数类型向bool转换: i32 -> bool
         if src_type.get_kind() == TypeKind.BASIC and dst_type.get_kind() == TypeKind.BASIC:
             src_bt, dst_bt = src_type.basic_type, dst_type.basic_type
             is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
             is_float = lambda bt: bt.value >= BasicType.F16.value
-            if is_integer(src_bt) and is_integer(dst_bt):
-                is_i_src = src_bt.value in [2, 4, 6, 8]
-                is_i_dst = dst_bt.value in [2, 4, 6, 8]
+            if (is_integer(src_bt) or src_bt == BasicType.BOOL) and is_integer(dst_bt):
+                i_bts = [BasicType.I8.value, BasicType.I16.value, BasicType.I32.value, BasicType.I64.value]
+                is_i_src = src_bt.value in i_bts
+                is_i_dst = dst_bt.value in i_bts
                 # u->i 0扩展 u->i 0扩展 i->i 符号扩展
                 if (not is_i_src) and (src_bt.value < dst_bt.value):
-                    src_value = self.ir_builder.zext(src_value, dst_type.to_ir_type())
+                    return True, self.ir_builder.zext(src_value, dst_type.to_ir_type())
                 elif is_i_src and is_i_dst and (src_bt.value < dst_bt.value):
-                    src_value = self.ir_builder.sext(src_value, dst_type.to_ir_type())
-                else:
-                    return False, None
-                return True, src_value
+                    return True, self.ir_builder.sext(src_value, dst_type.to_ir_type())
             elif is_integer(src_bt) and dst_bt == BasicType.BOOL:
-                res = self.ir_builder.icmp_signed('!=', src_value, src_value.type(0))  # src_value.type(0)获取本类型的0
-                return True, res
+                return True, self.ir_builder.icmp_signed('!=', src_value, src_value.type(0))
             elif is_float(src_bt) and is_float(dst_bt):
                 if src_bt.value <= dst_bt.value:
-                    src_value = self.ir_builder.fpext(src_value, dst_type.to_ir_type())
-                    return True, src_value
-                else:
-                    return False, None
-            else:
-                return False, None
+                    return True, self.ir_builder.fpext(src_value, dst_type.to_ir_type())
+            return False, None
 
         raise NotImplementedError()
 
@@ -291,11 +284,16 @@ class CodeGenVisitor():
 
         # 处理函数的参数列表
         param_list = []
-        for param in node.parameter_decl_list:
+        for param_idx, param in enumerate(node.parameter_decl_list):
             # 如果参数声明了具体类型，解析该类型
             if param.type_spec:
                 param.type_spec.accept(self)
                 param_type = self.ctx.current_type
+            # 对于成员函数，第一个类型若未指定，自动推导为该struct/interface的引用类型
+            elif param_idx == 0 and self.ctx.symbol_table.parent_type and (
+                    self.ctx.symbol_table.parent_type.get_kind() == TypeKind.STRUCT or
+                    self.ctx.symbol_table.parent_type.get_kind() == TypeKind.INTERFACE):
+                param_type = self.ctx.symbol_table.parent_type.clone().add_ref()
             # 否则将该参数的类型当作一个新的泛型类型，并加入到该函数类型的泛型列表中
             else:
                 param_type = Type(generic_name='')  # 匿名泛型类型
@@ -334,6 +332,9 @@ class CodeGenVisitor():
         struct_type = Type(struct_name=node.identifier, 
                            is_interface=False)
 
+        # 加入类型到符号表中
+        self.ctx.symbol_table.add_type(node.identifier, struct_type)
+
         # 若结构体有泛型参数列表，解析该列表
         for generics_type in node.generics_type_list:
             generics_type.accept(self)
@@ -357,9 +358,15 @@ class CodeGenVisitor():
 
         # 解析成员变量与成员函数
         for member_decl in node.member_decl_list:
-            member_decl.accept(self)
+            # 解析成员类型
+            member_decl.type_spec.accept(self)
+            # 添加成员变量至符号表与类型中的成员列表，此处无实际值
+            member_symbol = self.ctx.symbol_table.add_symbol(member_decl.identifier, self.ctx.current_type)
+            struct_type.add_struct_member(member_symbol)
+
         for member_func in node.member_func_definition_list:
-            member_func.accept(self)
+            # 解析函数定义
+            member_func.func_definition.accept(self)
 
         # 退出结构体作用域
         self.ctx.pop_scope()
@@ -369,19 +376,8 @@ class CodeGenVisitor():
     def visit(self, node: ast.InterfaceDecl):
         pass
 
-    @visitor.when(ast.MemberDecl)
-    def visit(self, node: ast.MemberDecl):
-        # 解析成员类型
-        node.type_spec.accept(self)
-        # 添加成员变量至符号表，此处无实际值
-        self.ctx.symbol_table.add_symbol(node.identifier, self.ctx.current_type)
-
     @visitor.when(ast.MemberFuncDecl)
     def visit(self, node: ast.MemberFuncDecl):
-        pass
-
-    @visitor.when(ast.MemberFuncDefinition)
-    def visit(self, node: ast.MemberFuncDefinition):
         pass
 
     @visitor.when(ast.MemberTypeFuncDecl)
@@ -516,23 +512,29 @@ class CodeGenVisitor():
 
             # 解析返回值表达式
             node.expression.accept(self)
+            ret_value = self.ctx.current_value
+
+            # 处理非显式引用 (左值转右值)
+            if (not isinstance(node.expression, ast.RefExpression) 
+                and self.ctx.current_type.get_kind() == TypeKind.REFERENCE):
+                ret_value_type = self.ctx.current_type.clone().remove_ref()
+                _, ret_value = self.ctx.convert_type(self.ctx.current_type, ret_value_type, ret_value)
+            else:
+                ret_value_type = self.ctx.current_type
 
             # 如果未指定返回类型，推导表达式类型为该返回值类型
             if ret_type.get_kind() == TypeKind.AUTO:
                 # 若当前是第一个return语句，记录解析的返回值类型
                 if self.ctx.deduced_ret_type is None:
-                    self.ctx.deduced_ret_type = self.ctx.current_type
+                    self.ctx.deduced_ret_type = ret_value_type
                 # 否则检查两个return的表达式类型一致
-                else:
-                    if not (self.ctx.current_type == self.ctx.deduced_ret_type):
-                        raise SemanticError('multiple return expression with different types')
-                ret_value = self.ctx.current_value
+                elif not (ret_value_type == self.ctx.deduced_ret_type):
+                    raise SemanticError('multiple return expression with different types')
             # 如果指定了返回类型，检验返回值是否可以转换为返回类型
             else:
-                cvt_success, ret_value = self.ctx.convert_type(
-                    self.ctx.current_type, ret_type, self.ctx.current_value)
+                cvt_success, ret_value = self.ctx.convert_type(ret_value_type, ret_type, ret_value)
                 if not cvt_success:
-                    raise SemanticError('condition is not convertible to bool')
+                    raise SemanticError('can not convert returned value type to function return type')
 
             self.ctx.ir_builder.ret(ret_value)
         else:
@@ -722,7 +724,6 @@ class CodeGenVisitor():
         elif node.operator == BinaryOp.NOT_EQUAL:  # !=
             value = self.ctx.ir_builder.icmp_signed('!=', lhs_value, rhs_value)
         elif node.operator == BinaryOp.EQUAL:  # ==
-            print('aaa')
             value = self.ctx.ir_builder.icmp_signed('==', lhs_value, rhs_value)
         elif node.operator == BinaryOp.LESS_EQUAL:  # <=
             value = self.ctx.ir_builder.icmp_signed('<=', lhs_value, rhs_value)
@@ -742,12 +743,12 @@ class CodeGenVisitor():
         # 解析表达式
         node.expression.accept(self)
         type, value = self.ctx.current_type, self.ctx.current_value
-        if (type.get_kind() == TypeKind.REFERENCE):
+
+        if type.get_kind() == TypeKind.REFERENCE:
             value_type = type.clone().remove_ref()
-            _, lhs_value = self.ctx.convert_type(type, value_type, value)
+            _, value = self.ctx.convert_type(type, value_type, value)
             type = value_type
-        print(type.get_kind())
-        print(node.operator)
+
         # 检查操作数类型可运算（整形或浮点型）
         if type.get_kind() != TypeKind.BASIC:
             raise SemanticError(f'unsupported type of unary operands')
@@ -872,6 +873,7 @@ class CodeGenVisitor():
         if cvt_success:
             self.ctx.current_type = target_type
             self.ctx.current_value = value
+            return
 
         # 否则使用尝试使用强制转换规则
         raise NotImplementedError()

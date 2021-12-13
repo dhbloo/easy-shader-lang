@@ -6,17 +6,17 @@ func inc_one(x : i32) -> i32 {
     let f : bool = 0;
     let g : bool = 0;
     let h : bool = !(f && g);
-    return x;
+    return x + (i32)h;
 }
 
 
-#let c : bool = 1;
-#let d : bool = 1;
-#let e : bool = c || d;
+let c : bool = 1;
+let d : bool = 1;
+let e : bool = c || d;
 
-#let f : i32 = 1;
-#let g : i32 = 1;
-#let h : i32 = f + g;
+let f : i32 = 1;
+let g : i32 = 1;
+let h : i32 = f + g;
 
 func deduce_ret_type(x : i64) {
     return x;
