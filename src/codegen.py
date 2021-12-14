@@ -217,7 +217,7 @@ class CodeGenVisitor():
                 for block in func_value.blocks:
                     new_func_value.basic_blocks.append(block)
                 # 替换符号表中的符号
-                func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
+                func_symbol = self.ctx.scope_stack[-1][0].query_symbol(node.func_decl.identifier)
                 func_symbol.value = new_func_value
             
             # 检查函数指令流结束
@@ -426,9 +426,9 @@ class CodeGenVisitor():
             member_func.func_definition.accept(self)
 
         # 解析构造函数
-        # if node.constructor_func_definition is None:
-        #     raise SemanticError('missing constructor definition in struct')
-        # node.constructor_func_definition.accept(self)
+        if node.constructor_func_definition is None:
+            raise SemanticError(f'missing constructor definition in {struct_type}')
+        node.constructor_func_definition.accept(self)
 
         # 退出结构体作用域
         self.ctx.pop_scope()
@@ -444,7 +444,23 @@ class CodeGenVisitor():
 
     @visitor.when(ast.ConstructorFuncDefinition)
     def visit(self, node: ast.ConstructorFuncDefinition):
-        pass
+        # 检验构造函数的声明类型应该与当前结构体一样
+        node.struct_type.accept(self)
+        if not (self.ctx.current_type == self.ctx.symbol_table.parent_type):
+            raise SemanticError('constructor must be of current struct type')
+        constructor_id = f'{self.ctx.current_type}'.replace(' ', '_')
+        
+        # 转换到一个普通的成员函数定义进行解析
+        func_def_node = ast.FunctionDefinition(node.location, 
+            func_decl=ast.FunctionDecl(node.location, constructor_id, node.func_sign),
+            block_stmt=node.block_stmt)
+        func_def_node.accept(self)
+
+        # 检查返回值为VOID
+        func_symbol = self.ctx.symbol_table.query_symbol(constructor_id)
+        func_ir_type : ir.FunctionType = func_symbol.value.function_type
+        if func_ir_type.return_type != ir.VoidType():
+            raise SemanticError('constructor return type must be void')
 
     @visitor.when(ast.DeclarationStatement)
     def visit(self, node: ast.DeclarationStatement):

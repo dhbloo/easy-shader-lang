@@ -3,6 +3,10 @@ struct Position {
     y : f32;
     z : f32;
 
+    func Position (self : Position ref) {
+        self.x = self.y = self.z = 0.0f;
+    }
+
     func length_square(self : Position ref) -> f32 {
         return self.x * self.x + self.y * self.y + self.z * self.z;
     }

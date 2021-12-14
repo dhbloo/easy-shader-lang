@@ -288,6 +288,8 @@ class StructDecl(TypeDeclaration):
             out += member.__str__(ind+2)
         for member in self.member_func_definition_list:
             out += member.__str__(ind+2)
+        if self.constructor_func_definition:
+            out += self.constructor_func_definition.__str__(ind+2)
         return out
 
 class InterfaceDecl(TypeDeclaration):
