@@ -398,12 +398,8 @@ class CodeGenVisitor():
     def visit(self, node: ast.MemberFuncDecl):
         pass
 
-    @visitor.when(ast.MemberTypeFuncDecl)
-    def visit(self, node: ast.MemberTypeFuncDecl):
-        pass
-
-    @visitor.when(ast.MemberTypeFuncDefinition)
-    def visit(self, node: ast.MemberTypeFuncDefinition):
+    @visitor.when(ast.ConstructorFuncDefinition)
+    def visit(self, node: ast.ConstructorFuncDefinition):
         pass
 
     @visitor.when(ast.DeclarationStatement)
@@ -844,7 +840,7 @@ class CodeGenVisitor():
 
     @visitor.when(ast.MemberExpression)
     def visit(self, node: ast.MemberExpression):
-        pass
+        raise NotImplementedError()
 
     @visitor.when(ast.IndexExpression)
     def visit(self, node: ast.IndexExpression):

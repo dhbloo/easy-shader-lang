@@ -242,14 +242,17 @@ class StructDecl(TypeDeclaration):
         self.base_type = base_type
         self.member_decl_list : List[MemberDecl] = []
         self.member_func_definition_list : List[MemberFuncDefinition] = []
+        self.constructor_func_definition : ConstructorFuncDefinition = None
         for member in member_list:
             self.add_member(member)
 
     def add_member(self, member):
         if isinstance(member, MemberDecl):
             self.member_decl_list.insert(0, member)
-        elif isinstance(member, MemberFuncDefinition) or isinstance(member, MemberTypeFuncDefinition):
+        elif isinstance(member, MemberFuncDefinition):
             self.member_func_definition_list.insert(0, member)
+        elif isinstance(member, ConstructorFuncDefinition):
+            self.constructor_func_definition = member
         else:
             raise TypeError(f'unknown member type {type(member)}')
 
@@ -312,23 +315,15 @@ class MemberFuncDefinition(StructMember):
     def __str__(self, ind=Indent()) -> str:
         return f'{ind}Member Function Definition:\n{self.func_definition.__str__(ind+1)}'
 
-class MemberTypeFuncDecl(InterfaceMember):
-    def __init__(self, loc, type_spec : TypeSpecifier, func_sign : FunctionSignature) -> None:
+class ConstructorFuncDefinition(StructMember):
+    def __init__(self, loc, struct_type : ComplexType, func_sign : FunctionSignature, block_stmt : BlockStatement) -> None:
         super().__init__(loc)
-        self.type_spec = type_spec
+        self.struct_type = struct_type
         self.func_sign = func_sign
-
-    def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Member Type Function Declaration:\n{ind+1}Type: {self.type_spec.__str__(ind+2)}\n{self.func_sign.__str__(ind+1)}'
-
-class MemberTypeFuncDefinition(StructMember):
-    def __init__(self, loc, type_func_decl : MemberTypeFuncDecl, block_stmt : BlockStatement) -> None:
-        super().__init__(loc)
-        self.type_func_decl = type_func_decl
         self.block_stmt = block_stmt
 
     def __str__(self, ind=Indent()) -> str:
-        return f'{ind}Member Type Function Definition:\n{self.type_func_decl.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
+        return f'{ind}Constructor Function Definition:\n{ind+1}{self.struct_type}\n{self.func_sign.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
 
 ###########################################################
 ## Sec6. Statement
