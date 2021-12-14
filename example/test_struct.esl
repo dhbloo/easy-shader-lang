@@ -2,9 +2,12 @@ struct Position {
     x : f32;
     y : f32;
     z : f32;
+
+    func length_square(self : Position ref) -> f32 {
+        return x * x + y * y + z * z;
+    }
 };
 
-let v : i32 = i32();
 
 
 # struct A <Q> {

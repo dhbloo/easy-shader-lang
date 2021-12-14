@@ -60,6 +60,12 @@ class SymbolTable():
         else:
             raise SemanticError(f'undefined symbol {name}')
 
+    def query_local_symbol(self, name : str) -> Optional[Symbol]:
+        if name in self.symbol_table:
+            return self.symbol_table[name]
+        else:
+            return None
+
     def clone(self) -> SymbolTable:
         new_symbol_table = SymbolTable(self.parent, self.parent_type)
         new_symbol_table.type_table = dict(**self.type_table)
