@@ -1,9 +1,12 @@
 from io import TextIOBase
+from termcolor import colored
 from llvmlite import ir
 import llvmlite.binding as llvm
+
+from .error import ParseError, SemanticError
 from .lexer import create_lexer, init_lexer_context
 from .parser import create_parser
-from .codegen import CodeGenContext, SemanticError
+from .codegen import CodeGenContext
 from . import ast
 
 lexer = create_lexer()
@@ -21,7 +24,12 @@ class Compiler():
         self.error_message : str = None
 
     def compile_to_ir(self, code_str, module_name) -> bool:
-        self.ast_root = parser.parse(code_str)
+        try:
+            self.ast_root = parser.parse(code_str)
+        except ParseError as err:
+            self.error_message = str(err)
+            return False
+
         if self.ast_only:
             return True
 

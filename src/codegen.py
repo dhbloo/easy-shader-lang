@@ -7,9 +7,9 @@ from .symbol import SymbolTable, Type
 from .error import SemanticError
 from . import ast
      
-I_BASICTYPES = [BasicType.I8.value, BasicType.I16.value, BasicType.I32.value, BasicType.I64.value]
-U_BASICTYPES = [BasicType.U8.value, BasicType.U16.value, BasicType.U32.value, BasicType.U64.value]
-F_BASICTYPES = [BasicType.F16.value, BasicType.F32.value, BasicType.F64.value]
+I_BASICTYPES = [BasicType.I8, BasicType.I16, BasicType.I32, BasicType.I64]
+U_BASICTYPES = [BasicType.U8, BasicType.U16, BasicType.U32, BasicType.U64]
+F_BASICTYPES = [BasicType.F16, BasicType.F32, BasicType.F64]
 
 class CodeGenContext():
     def __init__(self, module_name) -> None:
@@ -76,8 +76,8 @@ class CodeGenContext():
             is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
             is_float = lambda bt: bt.value >= BasicType.F16.value
             if (is_integer(src_bt) or src_bt == BasicType.BOOL) and is_integer(dst_bt):
-                is_i_src = src_bt.value in I_BASICTYPES
-                is_i_dst = dst_bt.value in I_BASICTYPES
+                is_i_src = src_bt in I_BASICTYPES
+                is_i_dst = dst_bt in I_BASICTYPES
                 # u->i 0扩展 u->i 0扩展 i->i 符号扩展
                 if (not is_i_src) and (src_bt.value < dst_bt.value):
                     return True, self.ir_builder.zext(src_value, dst_type.to_ir_type())
@@ -204,12 +204,13 @@ class CodeGenVisitor():
             node.block_stmt.accept(self)
 
             # 若该函数声明省略了返回值类型，推导其为返回表达式的类型
-            if func_type.clone().to_return_type().get_kind() == TypeKind.AUTO:
+            ret_type = func_type.clone().to_return_type()
+            if ret_type.get_kind() == TypeKind.AUTO:
                 # 若没有返回语句，返回类型为VOID
-                deduced_ret_type = self.ctx.deduced_ret_type or Type(basic_type=BasicType.VOID)
+                ret_type = self.ctx.deduced_ret_type or Type(basic_type=BasicType.VOID)
                 # 替换返回值类型得到新函数类型
                 new_func_type = func_value.function_type
-                new_func_type.return_type = deduced_ret_type.to_ir_type()
+                new_func_type.return_type = ret_type.to_ir_type()
                 # 重新构建函数值
                 new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
                 for block in func_value.blocks:
@@ -217,6 +218,13 @@ class CodeGenVisitor():
                 # 替换符号表中的符号
                 func_symbol = self.ctx.symbol_table.query_symbol(func_value.name)
                 func_symbol.value = new_func_value
+            
+            # 检查函数指令流结束
+            if not self.ctx.ir_builder.basic_block.is_terminated:
+                if ret_type.get_kind() == TypeKind.BASIC and ret_type.basic_type == BasicType.VOID:
+                    self.ctx.ir_builder.ret_void()
+                else:
+                    raise SemanticError(f'must return a expression of type {ret_type} at the end of function')
 
             self.ctx.pop_scope()
         # 否则此函数为泛型函数，记录未解析节点至函数类型中
@@ -448,6 +456,9 @@ class CodeGenVisitor():
         self.ctx.push_scope(new_symbol_table, self.ctx.ir_builder, self.ctx.deduced_ret_type)
         for stmt in node.statement_list:
             stmt.accept(self)
+            # 如果语句块提前结束，则不再解析之后的语句
+            if self.ctx.ir_builder.basic_block.is_terminated:
+                break
         _, _, deduced_ret_type = self.ctx.pop_scope()
         self.ctx.deduced_ret_type = self.ctx.deduced_ret_type or deduced_ret_type
 
@@ -471,22 +482,33 @@ class CodeGenVisitor():
         then_block = func.append_basic_block('if.then')
         else_block = func.append_basic_block('if.else')
         end_block = func.append_basic_block('if.endif')
-        self.ctx.ir_builder.cbranch(cond_value, then_block, else_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.cbranch(cond_value, then_block, else_block)
 
         # 解析True时的语句
         self.ctx.ir_builder.position_at_start(then_block)
         node.true_stmt.accept(self)
         if not self.ctx.ir_builder.basic_block.is_terminated:
             self.ctx.ir_builder.branch(end_block)
+            then_returned = False
+        else:
+            then_returned = True
 
         # 解析False时的语句
         self.ctx.ir_builder.position_at_start(else_block)
-        node.false_stmt.accept(self)
+        if node.false_stmt:
+            node.false_stmt.accept(self)
         if not self.ctx.ir_builder.basic_block.is_terminated:
             self.ctx.ir_builder.branch(end_block)
+            else_returned = False
+        else:
+            else_returned = True
 
         # 设置插入点至if之后
         self.ctx.ir_builder.position_at_start(end_block)
+        # 如果两条分支均已经结束，则说明该分支不可达
+        if then_returned and else_returned:
+            self.ctx.ir_builder.unreachable()
 
     @visitor.when(ast.WhileStatement)
     def visit(self, node: ast.WhileStatement):
@@ -495,7 +517,8 @@ class CodeGenVisitor():
         cond_block = func.append_basic_block('while.cond')
         loop_block = func.append_basic_block('while.loop')
         end_block = func.append_basic_block('while.end')
-        self.ctx.ir_builder.branch(cond_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(cond_block)
 
         # 解析WHITE条件表达式
         self.ctx.ir_builder.position_at_start(cond_block)
@@ -506,13 +529,15 @@ class CodeGenVisitor():
         if not cvt_success:
             raise SemanticError('condition is not convertible to bool')
         # 插入条件跳转指令
-        self.ctx.ir_builder.cbranch(cond_value, loop_block, end_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.cbranch(cond_value, loop_block, end_block)
 
         # 解析循环体
         self.ctx.push_loop_block(end_block, cond_block)
         self.ctx.ir_builder.position_at_start(loop_block)
         node.loop_stmt.accept(self)
-        self.ctx.ir_builder.branch(cond_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(cond_block)
         self.ctx.pop_loop_block()
 
         # 设置插入点至while之后
@@ -527,8 +552,10 @@ class CodeGenVisitor():
         func : ir.Function = self.ctx.ir_builder.function
         cond_block = func.append_basic_block('for.cond')
         loop_block = func.append_basic_block('for.loop')
+        iter_block = func.append_basic_block('for.iter')
         end_block = func.append_basic_block('for.end')
-        self.ctx.ir_builder.branch(cond_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(cond_block)
 
         # 解析For条件表达式
         self.ctx.ir_builder.position_at_start(cond_block)
@@ -540,18 +567,25 @@ class CodeGenVisitor():
             if not cvt_success:
                 raise SemanticError('condition is not convertible to bool')
             # 插入条件跳转指令
-            self.ctx.ir_builder.cbranch(cond_value, loop_block, end_block)
+            if not self.ctx.ir_builder.basic_block.is_terminated:
+                self.ctx.ir_builder.cbranch(cond_value, loop_block, end_block)
         # 若没有For条件，则无条件进入循环
         else:
-            self.ctx.ir_builder.branch(loop_block)
+            if not self.ctx.ir_builder.basic_block.is_terminated:
+                self.ctx.ir_builder.branch(loop_block)
+
+        # 解析循环条件
+        self.ctx.ir_builder.position_at_start(iter_block)
+        if node.iter_expr:
+            node.iter_expr.accept(self)
+        self.ctx.ir_builder.branch(cond_block)
 
         # 解析循环体
         self.ctx.push_loop_block(end_block, cond_block)
         self.ctx.ir_builder.position_at_start(loop_block)
         node.loop_stmt.accept(self)
-        if node.iter_expr:
-            node.iter_expr.accept(self)
-        self.ctx.ir_builder.branch(cond_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(iter_block)
         self.ctx.pop_loop_block()
 
         # 设置插入点至for之后
@@ -559,11 +593,13 @@ class CodeGenVisitor():
 
     @visitor.when(ast.BreakStatement)
     def visit(self, node: ast.BreakStatement):
-        self.ctx.ir_builder.branch(self.ctx.current_break_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(self.ctx.current_break_block)
 
     @visitor.when(ast.ContinueStatement)
     def visit(self, node: ast.ContinueStatement):
-        self.ctx.ir_builder.branch(self.ctx.current_continue_block)
+        if not self.ctx.ir_builder.basic_block.is_terminated:
+            self.ctx.ir_builder.branch(self.ctx.current_continue_block)
 
     @visitor.when(ast.ReturnStatement)
     def visit(self, node: ast.ReturnStatement):
@@ -707,7 +743,7 @@ class CodeGenVisitor():
             if is_float:
                 value = irb.fdiv(lhs_value, rhs_value)
             elif is_integer:
-                if basic_type.value in I_BASICTYPES:
+                if basic_type in I_BASICTYPES:
                     value = irb.sdiv(lhs_value, rhs_value)
                 else:
                     value = irb.udiv(lhs_value, rhs_value)
@@ -728,7 +764,7 @@ class CodeGenVisitor():
                 raise SemanticError('unsupported type of XOR')
         elif node.operator == BinaryOp.MOD:  # %
             if is_integer:
-                if basic_type.value in I_BASICTYPES:
+                if basic_type in I_BASICTYPES:
                     value = irb.srem(lhs_value, rhs_value)
                 else:
                     value = irb.urem(lhs_value, rhs_value)
@@ -968,13 +1004,13 @@ class CodeGenVisitor():
             is_bool = lambda bt: bt.value == BasicType.BOOL.value
             # float -> float, uint, sint, bool
             if is_float(src_bt):
-                if target_bt.value in F_BASICTYPES:  # 转float
+                if target_bt in F_BASICTYPES:  # 转float
                     self.ctx.current_type = target_type
                     self.ctx.current_value = self.ctx.ir_builder.fptrunc(value, target_type.to_ir_type())
-                elif target_bt.value in I_BASICTYPES:  # 转有符号int
+                elif target_bt in I_BASICTYPES:  # 转有符号int
                     self.ctx.current_type = target_type
                     self.ctx.current_value = self.ctx.ir_builder.fptosi(value, target_type.to_ir_type())
-                elif target_bt.value in U_BASICTYPES:  # 转无符号的int
+                elif target_bt in U_BASICTYPES:  # 转无符号的int
                     self.ctx.current_type = target_type
                     self.ctx.current_value = self.ctx.ir_builder.fptoui(value, target_type.to_ir_type())
             # int, bool -> float, uint, sint
@@ -983,7 +1019,7 @@ class CodeGenVisitor():
                     self.ctx.current_type = target_type
                     self.ctx.current_value = self.ctx.ir_builder.trunc(value, target_type.to_ir_type())
                 elif is_float(target_bt) :
-                    if src_bt.value in I_BASICTYPES:
+                    if src_bt in I_BASICTYPES:
                         self.ctx.current_type = target_type
                         self.ctx.current_value = self.ctx.ir_builder.sitofp(value, target_type.to_ir_type())
                     else :

@@ -1,8 +1,9 @@
+from ply.lex import LexToken
 import ply.yacc as yacc
-from termcolor import colored
 
 from .lexer import *
 from .enums import BasicType, BinaryOp, UnaryOp, IOType
+from .error import ParseError
 from . import ast
 
 
@@ -368,7 +369,7 @@ def p_while_clause(p):
     p[0] = ast.WhileStatement(p.lineno(1), p[3], p[5])
 
 def p_for_clause(p):
-    '''for_clause : FOR LPAREN for_init_statement expression_opt SEMICOLON expression RPAREN statement'''
+    '''for_clause : FOR LPAREN for_init_statement expression_opt SEMICOLON expression_opt RPAREN statement'''
     p[0] = ast.ForStatement(p.lineno(1), p[3], p[4], p[6], p[8])
 
 def p_forInit_statement(p):
@@ -571,8 +572,8 @@ precedence = (
 )
 
 # Error rule for syntax errors
-def p_error(p):
-    print(colored("Syntax error in input!", color='red'), "Traceback", p)
+def p_error(p : LexToken):
+    raise ParseError(f'Syntax error at line {p.lineno}: {p.value}')
 
 
 def create_parser(debug=None):
