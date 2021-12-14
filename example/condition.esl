@@ -1,0 +1,12 @@
+func is_equal(x : i64, y : i64) -> bool {
+    if (x == y)
+        return 1;
+    return 0;
+}
+
+func max(x : f32, y : f32) {
+    if (y > x)
+        return y;
+    else
+        return x;
+}

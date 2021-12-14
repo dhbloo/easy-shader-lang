@@ -1,0 +1,12 @@
+let a = 1;
+let b = ref(a);
+let c = b;
+let d = ref(b);
+
+func reference_test(x : i32, xp : i32 ref, yp : i32 ref) -> i32 ref {
+    xp = x + 1;
+    x = xp + 1;
+    xp = ref(yp);
+    xp = yp;
+    return ref(xp);
+}

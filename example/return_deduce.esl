@@ -1,0 +1,11 @@
+let v = i32[3]();
+
+func deduce_ret_type(x : i64, y : i64) {
+    return x + y * x;
+}
+
+func deduce_ret_type_arr() {
+    return v;
+}
+
+func ret_void() -> void {}

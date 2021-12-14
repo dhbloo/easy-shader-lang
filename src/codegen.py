@@ -127,6 +127,7 @@ class CodeGenVisitor():
 
     @visitor.when(ast.TypeAliasDecl)
     def visit(self, node: ast.TypeAliasDecl):
+        node.type_spec.accept(self)
         self.ctx.symbol_table.add_type(node.identifier, self.ctx.current_type)
 
     @visitor.when(ast.VariableDecl)
@@ -625,7 +626,7 @@ class CodeGenVisitor():
             else:
                 cvt_success, ret_value = self.ctx.convert_type(ret_value_type, ret_type, ret_value)
                 if not cvt_success:
-                    raise SemanticError('can not convert returned value type to function return type')
+                    raise SemanticError(f'can not convert returned type {ret_value_type} to function return type {ret_type}')
 
             self.ctx.ir_builder.ret(ret_value)
         else:
@@ -929,7 +930,6 @@ class CodeGenVisitor():
             assert member_symbol.type.get_kind() != TypeKind.FUNCTION
             self.ctx.current_type = member_symbol.type.clone().add_ref()
             self.ctx.current_value = member_value
-
 
     @visitor.when(ast.IndexExpression)
     def visit(self, node: ast.IndexExpression):

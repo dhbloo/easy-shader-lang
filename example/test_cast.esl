@@ -1,4 +1,0 @@
-func test_cast(){
-
-    let c : f32 = (f32)(1 == 3);
-}

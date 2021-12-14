@@ -1,0 +1,28 @@
+func sum_while(start : i32, end : i32, step : i32) -> i32 {
+    let x = start;
+    let sum = 0;
+    while (x <= end) {
+        sum = sum + x;
+        x = x + step;
+    }
+    return sum;
+}
+
+func sum_for(start : i32, end : i32, step : i32) -> i32 {
+    let sum = 0;
+    for (let x = start; x <= end; x = x + step) {
+        sum = sum + x;
+        x = x + 123;
+    }
+    return sum;
+}
+
+func inf_loop(times : i32) {
+    for (;;) {
+        times = times - 1;
+        if (times == 0)
+            break;
+        else
+            continue;
+    }
+}

@@ -1,0 +1,6 @@
+type vec3f = f32[3];
+type mat3f = f32[3][3];
+
+func length_square(v : vec3f) -> f32 {
+    return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+}

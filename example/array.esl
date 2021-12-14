@@ -1,0 +1,17 @@
+let arr : i32[4] = i32[4]();
+let arr2 : i32[4] = i32[4](1, 2, 3, 4);
+let arr3 : i32[4] = i32[4](5, 6);
+let arr4 : i32[2][3] = i32[2][3](i32[3](1, 2, 3), i32[3](4, 5, 6));
+
+func array_test(x : i32) -> i32 {
+    arr[0] = x;
+    return arr[x];
+}
+
+func array_test2(x : i32) -> i32[3] {
+    return arr4[x];
+}
+
+func array_test3(x : i32) -> i32[3] ref {
+    return ref(arr4[x]);
+}
