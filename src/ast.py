@@ -105,6 +105,23 @@ class FunctionDefinition(Node):
     def __str__(self, ind=Indent()) -> str:
         return f'{ind}Function Definition:\n{self.func_decl.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
 
+class ConvertionDecl(BlockDeclaration):
+    def __init__(self, loc, func_sign : FunctionSignature) -> None:
+        super().__init__(loc)
+        self.func_sign = func_sign
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Convertion Declaration:\n{self.func_sign.__str__(ind+1)}'
+
+class ConvertionDefinition(Node):
+    def __init__(self, loc, conv_decl : ConvertionDecl, block_stmt : BlockStatement) -> None:
+        super().__init__(loc)
+        self.conv_decl = conv_decl
+        self.block_stmt = block_stmt
+
+    def __str__(self, ind=Indent()) -> str:
+        return f'{ind}Convertion Definition:\n{self.conv_decl.__str__(ind+1)}{self.block_stmt.__str__(ind+1)}'
+
 
 ###########################################################
 ## Sec2. Type specifier
