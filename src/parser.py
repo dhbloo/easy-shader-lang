@@ -17,6 +17,7 @@ def p_expression_translationUnit(p):
 def p_translationUnit_nest(p):
     '''translation_unit : block_decl translation_unit
                         | function_def translation_unit
+                        | convertion_def translation_unit
                         | empty'''
     if p[1]:
         p[0] = p[2]
@@ -28,7 +29,8 @@ def p_block_decl(p):
     '''block_decl : type_decl SEMICOLON
                   | variable_decl SEMICOLON
                   | constant_decl SEMICOLON
-                  | function_decl SEMICOLON'''
+                  | function_decl SEMICOLON
+                  | convertion_decl SEMICOLON'''
     context["generic_func"].clear()
     p[0] = p[1]
 
@@ -79,6 +81,16 @@ def p_function_def(p):
     '''function_def : function_decl block_statement'''
     context["generic_func"].clear()
     p[0] = ast.FunctionDefinition(p.lineno(1), p[1], p[2])
+
+def p_convertion_decl(p):
+    '''convertion_decl : CONVERT function_sign'''
+    p[0] = ast.ConvertionDecl(p.lineno(1), p[2])
+
+def p_convertion_def(p):
+    '''convertion_def : convertion_decl block_statement'''
+    context["generic_func"].clear()
+    p[0] = ast.ConvertionDefinition(p.lineno(1), p[1], p[2])
+
 
 def p_type_spec(p):
     '''type_spec : simple_type
@@ -147,7 +159,6 @@ def p_struct_decl(p):
     '''struct_decl : STRUCT ID new_struct generics_type_list_opt base_type_list_opt LBRACE member_decl_nest RBRACE'''
     context["generic_top"].clear()
     p[0] = ast.StructDecl(p.lineno(1), p[2], p[7], p[4], p[5])
-
 def p_new_struct(p):
     '''new_struct :'''
     context["struct"].append(p[-1])
@@ -208,23 +219,23 @@ def p_interface_member_decl_nest(p):
 def p_member_decl(p):
     '''member_decl : member_declarator
                    | function_def
-                   | type_function_def'''
+                   | constructor_func_def'''
     p[0] = p[1]
-    if isinstance(p[0], ast.FunctionDefinition):
-        p[0] = ast.MemberFuncDefinition(p.lineno(1), p[0])
+    if isinstance(p[1], ast.FunctionDefinition):
+        p[0] = ast.MemberFuncDefinition(p.lineno(1), p[1])
 
-def p_type_function_def(p):
-    '''type_function_def : type_function_decl block_statement'''
-    p[0] = ast.MemberTypeFuncDefinition(p.lineno(1), p[1], p[2])
+def p_constructor_func_def(p):
+    '''constructor_func_def : FUNC complex_type function_sign block_statement'''
+    p[0] = ast.ConstructorFuncDefinition(p.lineno(1), p[2], p[3], p[4])
+
+# def p_type_function_def(p):
+#     '''type_function_def : type_function_decl block_statement'''
+#     p[0] = ast.MemberTypeFuncDefinition(p.lineno(1), p[1], p[2])
 
 def p_interface_member_decl(p):
-    '''interface_member_decl : function_decl SEMICOLON
-                             | type_function_decl SEMICOLON'''
+    '''interface_member_decl : function_decl SEMICOLON'''
     context["generic_func"].clear()
-    if isinstance(p[1], ast.FunctionDecl):
-        p[0] = ast.MemberFuncDecl(p.lineno(2), p[1])
-    else:
-        p[0] = p[1]
+    p[0] = ast.MemberFuncDecl(p.lineno(2), p[1])
 
 
 def p_type_function_decl(p):

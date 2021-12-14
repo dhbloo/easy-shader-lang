@@ -100,6 +100,7 @@ reserved = {
     'in'        : 'IN',
     'out'       : 'OUT',
     'ref'       : 'REF',
+    'convert'   : 'CONVERT',
     'type'      : 'TYPE',
     'void'      : 'VOID',
     'bool'      : 'BOOL',

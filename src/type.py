@@ -197,11 +197,11 @@ class Type():
                 return ir.DoubleType()
             elif self.basic_type == BasicType.I8 or self.basic_type == BasicType.U8:
                 return ir.IntType(8)
-            elif self.basic_type == BasicType.I16 or self.basic_type == BasicType.U8:
+            elif self.basic_type == BasicType.I16 or self.basic_type == BasicType.U16:
                 return ir.IntType(16)
-            elif self.basic_type == BasicType.I32 or self.basic_type == BasicType.U8:
+            elif self.basic_type == BasicType.I32 or self.basic_type == BasicType.U32:
                 return ir.IntType(32)
-            elif self.basic_type == BasicType.I64 or self.basic_type == BasicType.U8:
+            elif self.basic_type == BasicType.I64 or self.basic_type == BasicType.U64:
                 return ir.IntType(64)
             else:
                 raise NotImplementedError(f'IR BasicType {self.basic_type} not implemented')

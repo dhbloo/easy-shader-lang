@@ -37,12 +37,15 @@ class TranslationUnit(Node):
         self.declaration_list : List[Node] = []
         self.block_declaration_list : List[BlockDeclaration] = []
         self.func_definition_list : List[FunctionDefinition] = []
+        self.convertion_definition_list : List[ConvertionDefinition] = []
 
     def add_declaration(self, decl):
         if isinstance(decl, BlockDeclaration):
             self.block_declaration_list.insert(0, decl)
         elif isinstance(decl, FunctionDefinition):
             self.func_definition_list.insert(0, decl)
+        elif isinstance(decl, ConvertionDefinition):
+            self.convertion_definition_list.insert(0, decl)
         else:
             raise TypeError(f'unknown declaration type {type(decl)}')
         self.declaration_list.insert(0, decl)
@@ -52,6 +55,8 @@ class TranslationUnit(Node):
         for decl in self.block_declaration_list:
             out += decl.__str__(ind+1)
         for defi in self.func_definition_list:
+            out += defi.__str__(ind+1)
+        for defi in self.convertion_definition_list:
             out += defi.__str__(ind+1)
         return out
 

@@ -8,6 +8,8 @@ from .error import SemanticError
 from . import ast
      
 I_BASICTYPES = [BasicType.I8.value, BasicType.I16.value, BasicType.I32.value, BasicType.I64.value]
+U_BASICTYPES = [BasicType.U8.value, BasicType.U16.value, BasicType.U32.value, BasicType.U64.value]
+F_BASICTYPES = [BasicType.F16.value, BasicType.F32.value, BasicType.F64.value]
 
 class CodeGenContext():
     def __init__(self, module_name) -> None:
@@ -665,24 +667,7 @@ class CodeGenVisitor():
         is_float = basic_type == BasicType.F16 or basic_type == BasicType.F32 or basic_type == BasicType.F64
         is_integer = not is_bool and not is_float
         cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed
-        '''binary_expr : expression PLUS expression
-                           | expression MINUS expression
-                           | expression MUL expression
-                           | expression DIV expression
-                           | expression AND expression
-                           | expression OR expression
-                           | expression XOR expression
-                           | expression MOD expression
-                           | expression LSHIFT expression
-                           | expression RSHIFT expression
-                           | expression LOGICAL_OR expression
-                           | expression LOGICAL_AND expression
-                           | expression NOT_EQUAL expression
-                           | expression EQUAL expression
-                           | expression LESS_EQUAL expression
-                           | expression LESS expression
-                           | expression GREATER_EQUAL expression
-                           | expression GREATER expression'''
+
         if node.operator == BinaryOp.PLUS:  # +
             if is_bool:
                 raise SemanticError('can not do PLUS to bool type')
@@ -906,15 +891,54 @@ class CodeGenVisitor():
         src_type, value = self.ctx.current_type, self.ctx.current_value
 
         # 首先尝试能否使用自动转换规则
-        cvt_success, value = self.ctx.convert_type(src_type, target_type, value)
+        cvt_success, cvt_value = self.ctx.convert_type(src_type, target_type, value)
         if cvt_success:
             self.ctx.current_type = target_type
-            self.ctx.current_value = value
+            self.ctx.current_value = cvt_value
             return
 
+        if (src_type.get_kind() == TypeKind.REFERENCE):
+            value_type = src_type.clone().remove_ref()
+            _, value = self.ctx.convert_type(src_type, value_type, value)
+            src_type = value_type
+        print('aaa')
         # 否则使用尝试使用强制转换规则
         # 1. 向下转换: i64 -> i32 -> i16 -> i8, f64 -> f32 -> f16
         # 2. 浮点与(整数,bool)互相转换: iX <-> fX, bool <-> fX
+        # 都是基础类型才能转
+        print('src_type.get_kind()', src_type.get_kind())
+        print('target_type.get_kind()', target_type.get_kind())
+
+        if src_type.get_kind() == TypeKind.BASIC and target_type.get_kind() == TypeKind.BASIC:
+            src_bt, target_bt = src_type.basic_type, target_type.basic_type
+            print(src_bt.value, target_bt.value)
+            is_integer = lambda bt: BasicType.I8.value <= bt.value <= BasicType.U64.value
+            is_float = lambda bt: bt.value >= BasicType.F16.value
+            is_bool = lambda bt: bt.value == BasicType.BOOL.value
+            # float -> float, uint, sint, bool
+            if is_float(src_bt):
+                if target_bt.value in F_BASICTYPES:  # 转float
+                    self.ctx.current_type = target_type
+                    self.ctx.current_value = self.ctx.ir_builder.fptrunc(value, target_type.to_ir_type())
+                elif target_bt.value in I_BASICTYPES:  # 转有符号int
+                    self.ctx.current_type = target_type
+                    self.ctx.current_value = self.ctx.ir_builder.fptosi(value, target_type.to_ir_type())
+                elif target_bt.value in U_BASICTYPES:  # 转无符号的int
+                    self.ctx.current_type = target_type
+                    self.ctx.current_value = self.ctx.ir_builder.fptoui(value, target_type.to_ir_type())
+            # int, bool -> float, uint, sint
+            elif is_integer(src_bt) or is_bool(src_bt):
+                if is_integer(target_bt):
+                    self.ctx.current_type = target_type
+                    self.ctx.current_value = self.ctx.ir_builder.trunc(value, target_type.to_ir_type())
+                elif is_float(target_bt) :
+                    if src_bt.value in I_BASICTYPES:
+                        self.ctx.current_type = target_type
+                        self.ctx.current_value = self.ctx.ir_builder.sitofp(value, target_type.to_ir_type())
+                    else :
+                        self.ctx.current_type = target_type
+                        self.ctx.current_value = self.ctx.ir_builder.uitofp(value, target_type.to_ir_type())
+            return
         raise NotImplementedError()
 
     @visitor.when(ast.NewExpression)
