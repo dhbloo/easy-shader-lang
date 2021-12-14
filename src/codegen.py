@@ -113,7 +113,6 @@ class CodeGenContext():
 class CodeGenVisitor():
     def __init__(self, context : CodeGenContext) -> None:
         self.ctx = context
-        print(Type(basic_type=BasicType.I32).add_array_dim(2).add_array_dim(3))
 
     @visitor.on('node')
     def visit(self, node):
@@ -123,6 +122,8 @@ class CodeGenVisitor():
     def visit(self, node : ast.TranslationUnit):
         for decl in node.declaration_list:
             decl.accept(self)
+        # init函数返回void
+        self.ctx.ir_builder.ret_void()
 
     @visitor.when(ast.TypeAliasDecl)
     def visit(self, node: ast.TypeAliasDecl):
@@ -254,12 +255,12 @@ class CodeGenVisitor():
     @visitor.when(ast.ArrayType)
     def visit(self, node: ast.ArrayType):
         node.type.accept(self)
-        self.ctx.current_type.add_array_dim(node.size or 0)
+        self.ctx.current_type = self.ctx.current_type.clone().add_array_dim(node.size or 0)
 
     @visitor.when(ast.ReferenceType)
     def visit(self, node: ast.ReferenceType):
         node.type.accept(self)
-        self.ctx.current_type.add_ref()
+        self.ctx.current_type = self.ctx.current_type.clone().add_ref()
 
     @visitor.when(ast.FunctionType)
     def visit(self, node: ast.FunctionType):
@@ -278,7 +279,15 @@ class CodeGenVisitor():
                 module = ir.Module()
             else:
                 module = self.ctx.module
-            func_value = ir.Function(module, func_type.to_ir_type(), node.identifier)
+
+            # 对于成员函数，将其结构体或接口的名字加到前面
+            if (self.ctx.symbol_table.parent_type is not None and 
+                self.ctx.symbol_table.parent_type.get_kind() in [TypeKind.STRUCT, TypeKind.INTERFACE]):
+                func_name = f'{self.ctx.symbol_table.parent_type.struct_name}.{node.identifier}'
+            else:
+                func_name = node.identifier
+
+            func_value = ir.Function(module, func_type.to_ir_type(), func_name)
         # 否则对于泛型函数，其符号值目前留空，等待实例化时再生成值
         else:
             func_value = None
@@ -294,7 +303,7 @@ class CodeGenVisitor():
         if node.return_type_spec:
             # 返回值从return_type_spec得到
             node.return_type_spec.accept(self)
-            func_type = self.ctx.current_type
+            func_type = self.ctx.current_type.clone()
         else:
             # 返回值是Auto
             func_type = Type()
@@ -389,12 +398,19 @@ class CodeGenVisitor():
         self.ctx.push_scope(struct_type.symbol_table, self.ctx.ir_builder, self.ctx.deduced_ret_type)
 
         # 解析成员变量与成员函数
-        for member_decl in node.member_decl_list:
+        for member_idx, member_decl in enumerate(node.member_decl_list):
             # 解析成员类型
             member_decl.type_spec.accept(self)
             # 添加成员变量至符号表与类型中的成员列表，此处无实际值
-            member_symbol = self.ctx.symbol_table.add_symbol(member_decl.identifier, self.ctx.current_type)
+            member_symbol = self.ctx.symbol_table.add_symbol(member_decl.identifier, self.ctx.current_type, member_idx)
             struct_type.add_struct_member(member_symbol)
+
+        # 完成ir type构建
+        struct_ir_type : ir.IdentifiedStructType = struct_type.to_ir_type()
+        struct_ir_type.set_body(*[
+            member_symbol.type.to_ir_type() 
+            for member_symbol in struct_type.member_list
+        ])
 
         for member_func in node.member_func_definition_list:
             # 解析函数定义
@@ -408,13 +424,6 @@ class CodeGenVisitor():
         # 退出结构体作用域
         self.ctx.pop_scope()
         self.ctx.current_type = struct_type
-
-        # 完成ir type构建
-        struct_ir_type : ir.IdentifiedStructType = struct_type.to_ir_type()
-        struct_ir_type.set_body(*[
-            member_symbol.type.to_ir_type() 
-            for member_symbol in struct_type.member_list
-        ])
 
     @visitor.when(ast.InterfaceDecl)
     def visit(self, node: ast.InterfaceDecl):
@@ -848,7 +857,43 @@ class CodeGenVisitor():
 
     @visitor.when(ast.MemberExpression)
     def visit(self, node: ast.MemberExpression):
-        raise NotImplementedError()
+        node.object_expr.accept(self)
+        obj_type, obj_value = self.ctx.current_type, self.ctx.current_value
+
+        # 获得对象表达式值类型（如有引用则去除）
+        if obj_type.get_kind() == TypeKind.REFERENCE:
+            obj_value_type = obj_type.clone().remove_ref()
+        else:
+            obj_value_type = obj_type
+
+        # 检验对象值的类型为结构体
+        if obj_value_type.get_kind() != TypeKind.STRUCT:
+            raise SemanticError(f'object expression type must be struct (not {obj_value_type})')
+        
+        # 在结构体符号表中查找其成员
+        member_symbol = obj_value_type.symbol_table.query_local_symbol(node.member_id)
+        if member_symbol is None:
+            raise SemanticError(f'no member named {node.member_id} in {obj_value_type}')
+
+        # 对于结构体引用类型，产生成员指针
+        if obj_type.get_kind() == TypeKind.REFERENCE:
+            assert type(member_symbol.value) is int
+            member_value = self.ctx.ir_builder.gep(obj_value, [
+                ir.IntType(32)(0), ir.IntType(32)(member_symbol.value),
+            ], inbounds=True)
+        else:
+            raise NotImplementedError()
+
+        # 若符号类型本身是引用，则先获取其指向的变量作为左值
+        if member_symbol.type.get_kind() == TypeKind.REFERENCE:
+            self.ctx.current_type = member_symbol.type
+            self.ctx.current_value = self.ctx.ir_builder.load(member_value)
+        # 否则取出符号的变量值，并将类型修改为引用表示左值（除了函数值与常量）
+        else:
+            assert member_symbol.type.get_kind() != TypeKind.FUNCTION
+            self.ctx.current_type = member_symbol.type.clone().add_ref()
+            self.ctx.current_value = member_value
+
 
     @visitor.when(ast.IndexExpression)
     def visit(self, node: ast.IndexExpression):
@@ -912,17 +957,12 @@ class CodeGenVisitor():
             value_type = src_type.clone().remove_ref()
             _, value = self.ctx.convert_type(src_type, value_type, value)
             src_type = value_type
-        print('aaa')
         # 否则使用尝试使用强制转换规则
         # 1. 向下转换: i64 -> i32 -> i16 -> i8, f64 -> f32 -> f16
         # 2. 浮点与(整数,bool)互相转换: iX <-> fX, bool <-> fX
         # 都是基础类型才能转
-        print('src_type.get_kind()', src_type.get_kind())
-        print('target_type.get_kind()', target_type.get_kind())
-
         if src_type.get_kind() == TypeKind.BASIC and target_type.get_kind() == TypeKind.BASIC:
             src_bt, target_bt = src_type.basic_type, target_type.basic_type
-            print(src_bt.value, target_bt.value)
             is_integer = lambda bt: BasicType.I8.value <= bt.value <= BasicType.U64.value
             is_float = lambda bt: bt.value >= BasicType.F16.value
             is_bool = lambda bt: bt.value == BasicType.BOOL.value

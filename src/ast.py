@@ -270,9 +270,9 @@ class StructDecl(TypeDeclaration):
 
     def add_member(self, member):
         if isinstance(member, MemberDecl):
-            self.member_decl_list.insert(0, member)
+            self.member_decl_list.append(member)
         elif isinstance(member, MemberFuncDefinition):
-            self.member_func_definition_list.insert(0, member)
+            self.member_func_definition_list.append(member)
         elif isinstance(member, ConstructorFuncDefinition):
             self.constructor_func_definition = member
         else:

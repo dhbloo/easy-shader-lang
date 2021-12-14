@@ -228,19 +228,10 @@ def p_constructor_func_def(p):
     '''constructor_func_def : FUNC complex_type function_sign block_statement'''
     p[0] = ast.ConstructorFuncDefinition(p.lineno(1), p[2], p[3], p[4])
 
-# def p_type_function_def(p):
-#     '''type_function_def : type_function_decl block_statement'''
-#     p[0] = ast.MemberTypeFuncDefinition(p.lineno(1), p[1], p[2])
-
 def p_interface_member_decl(p):
     '''interface_member_decl : function_decl SEMICOLON'''
     context["generic_func"].clear()
     p[0] = ast.MemberFuncDecl(p.lineno(2), p[1])
-
-
-def p_type_function_decl(p):
-    '''type_function_decl : FUNC type_spec function_sign'''
-    p[0] = ast.MemberTypeFuncDecl(p.lineno(1), p[2], p[3])
 
 def p_member_declarator(p):
     '''member_declarator : ID COLON type_spec SEMICOLON'''

@@ -14,10 +14,15 @@ def run():
         code_str = f.read()
 
     compiler = Compiler(ast_only=args.ast_only)
-    success = compiler.compile(code_str, args.source_file)
+    success = compiler.compile_to_ir(code_str, args.source_file)
     if success:
-        print(colored('Compile success!', color='green'))
         compiler.dump_text(stdout)
+
+        if compiler.verify():
+            print(colored('Compile success!', color='green'))
+        else:
+            print(colored('Error in IR code', color='red'))
+            print(colored(f'Error: {compiler.get_error_message()}', color='yellow'))
     else:
         print(colored('Compile failed!', color='red'))
         print(colored(f'Error: {compiler.get_error_message()}', color='yellow'))

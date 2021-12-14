@@ -7,7 +7,7 @@ from .type import Type
 
 
 class Symbol():
-    def __init__(self, id : str, type : Type, value : Optional[ir.Value]) -> None:
+    def __init__(self, id : str, type : Type, value : Optional[ir.Value | int]) -> None:
         self.id = id
         self.type = type
         self.value = value
@@ -24,7 +24,7 @@ class SymbolTable():
     def is_root(self) -> bool:
         return self.parent is None
 
-    def add_symbol(self, name : str, type : Type, value : Optional[ir.Value] = None) -> Symbol:
+    def add_symbol(self, name : str, type : Type, value : Optional[ir.Value | int] = None) -> Symbol:
         if name in self.symbol_table:
             raise SemanticError(f'redefine symbol {name}')
     

@@ -4,10 +4,13 @@ struct Position {
     z : f32;
 
     func length_square(self : Position ref) -> f32 {
-        return x * x + y * y + z * z;
+        return self.x * self.x + self.y * self.y + self.z * self.z;
     }
 };
 
+func f(p : Position) -> Position {
+    return p;
+}
 
 
 # struct A <Q> {
