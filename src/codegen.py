@@ -386,9 +386,21 @@ class CodeGenVisitor():
             # 解析函数定义
             member_func.func_definition.accept(self)
 
+        # 解析构造函数
+        # if node.constructor_func_definition is None:
+        #     raise SemanticError('missing constructor definition in struct')
+        # node.constructor_func_definition.accept(self)
+
         # 退出结构体作用域
         self.ctx.pop_scope()
         self.ctx.current_type = struct_type
+
+        # 完成ir type构建
+        struct_ir_type : ir.IdentifiedStructType = struct_type.to_ir_type()
+        struct_ir_type.set_body(*[
+            member_symbol.type.to_ir_type() 
+            for member_symbol in struct_type.member_list
+        ])
 
     @visitor.when(ast.InterfaceDecl)
     def visit(self, node: ast.InterfaceDecl):
@@ -907,7 +919,35 @@ class CodeGenVisitor():
 
     @visitor.when(ast.NewExpression)
     def visit(self, node: ast.NewExpression):
-        raise NotImplementedError()
+        node.type_spec.accept(self)
+        new_type = self.ctx.current_type
+
+        # 构造基本类型
+        if new_type.get_kind() == TypeKind.BASIC:
+            if new_type.basic_type == BasicType.VOID:
+                raise SemanticError(f'void type can not be instantiated')
+            elif len(node.param_list) == 0:
+                value = new_type.to_ir_type()(0)
+            elif len(node.param_list) == 1:
+                node.param_list[0].accept(self)
+                value_type, value = self.ctx.get_current_assignment_value(node.param_list[0])
+                cvt_success, value = self.ctx.convert_type(value_type, new_type, value)
+                if not cvt_success:
+                    raise SemanticError(f'can not convert type {value_type} to type {new_type}')
+            else:
+                raise SemanticError(f'more than one parameters in basic type new expression')
+        # 构造结构体类型（调用构造函数）
+        elif new_type.get_kind() == TypeKind.STRUCT:
+            raise NotImplementedError()
+        # 构造数组类型
+        elif new_type.get_kind() == TypeKind.ARRAY:
+            raise NotImplementedError()
+        elif new_type.get_kind() == TypeKind.INTERFACE:
+            raise SemanticError(f'can not instantiate interface {new_type}')
+        else:
+            raise SemanticError(f'can not instantiate type {new_type}')
+
+        self.ctx.current_value = value
 
     @visitor.when(ast.IOExpression)
     def visit(self, node: ast.IOExpression):

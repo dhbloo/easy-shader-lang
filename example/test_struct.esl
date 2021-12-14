@@ -1,28 +1,28 @@
-interface Geometry{
-
-};
-interface Geometry1{
-
-};
-
-struct Sphere<T> : Geometry, Geometry1 {
-
+struct Position {
+    x : f32;
+    y : f32;
+    z : f32;
 };
 
+let v : i32 = i32();
 
 
-struct A <Q> {
-    x : Q;
-    func ff<U>(self, y : U) -> Q {
-        return self.x + (Q)y;
-    }
-};
-
-
-struct F {
-    a : i32;
-    b : f32;
-    func call(self, x : A<i32>, y:A<i32>) {
-        return x + y + self.a + (i32)self.b;
-    }
-};
+# struct A <Q> {
+#     x : Q;
+#     func ff<U>(self, y : U) -> Q {
+#         return self.x + (Q)y;
+#     }
+# };
+# 
+# struct F {
+#     a : i32;
+#     b : f32;
+#     func call(self, x : A<i32>, y:A<i32>) {
+#         return x + y + self.a + (i32)self.b;
+#     }
+# };
+# 
+# interface Geometry {};
+# interface Drawable {};
+# 
+# struct Sphere<T> : Geometry, Drawable {};

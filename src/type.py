@@ -34,6 +34,7 @@ class Type():
         self.is_interface : bool = is_interface
         self.base_type_list : List[Type] = []
         self.member_list : List[symbol.Symbol] = []
+        self.constructor : Optional[symbol.Symbol] = None
 
         # Array type
         self.array_dims : List[int] = []  # 0 for empty size
@@ -176,8 +177,8 @@ class Type():
 
         return False
 
-    def specialize(self, generic_specialization_list : List[Type]) -> Type:
-        raise NotImplementedError()
+    def __str__(self) -> str:
+        return str(self.get_kind())
 
     def to_ir_type(self) -> ir.Type:
         kind = self.get_kind()
@@ -205,7 +206,7 @@ class Type():
             else:
                 raise NotImplementedError(f'IR BasicType {self.basic_type} not implemented')
         elif kind == TypeKind.STRUCT:
-            raise NotImplementedError()
+            return ir.global_context.get_identified_type(self.struct_name)
         elif kind == TypeKind.ARRAY:
             element_ir_type = self.clone().to_element_type().to_ir_type()
             return ir.ArrayType(element_ir_type, self.array_dims[-1])
@@ -221,5 +222,5 @@ class Type():
         else:
             assert False, "uninstantiabled type!"
 
-    def __str__(self) -> str:
-        return str(self.get_kind())
+    def specialize(self, generic_specialization_list : List[Type]) -> Type:
+        raise NotImplementedError()
