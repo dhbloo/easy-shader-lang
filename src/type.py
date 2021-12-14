@@ -15,7 +15,8 @@ class Type():
                  generic_name : Optional[str] = None,
                  generic_type_range : Optional[Type] = None,
                  struct_name : Optional[str] = None,
-                 is_interface : bool = False) -> None:
+                 is_interface : bool = False,
+                 func_ret_type : Optional[Type] = None) -> None:
         assert ((basic_type or generic_name or struct_name) and 
                 not (basic_type and generic_name) or 
                 not (basic_type and struct_name) or
@@ -43,7 +44,8 @@ class Type():
         self.reference = False
 
         # Function type
-        self.func_params : Optional[List[symbol.Symbol]] = None
+        self.func_ret_type : Optional[Type] = func_ret_type
+        self.func_params : List[symbol.Symbol] = []
 
         # Struct / Interface / Function type
         self.generics_type_list : List[Type] = []
@@ -51,7 +53,7 @@ class Type():
         self.unfinished_node : Optional[Node] = None
 
     def get_kind(self) -> TypeKind:
-        if self.func_params is not None:
+        if self.func_ret_type is not None:
             return TypeKind.FUNCTION
         elif self.reference:
             return TypeKind.REFERENCE
@@ -107,8 +109,8 @@ class Type():
         self.reference = True
         return self
 
-    def add_func_params(self, param_list : List[symbol.Symbol]) -> Type:
-        self.func_params = param_list
+    def add_func_param(self, param : symbol.Symbol) -> Type:
+        self.func_params.append(param)
         return self
 
     def to_element_type(self) -> Type:
@@ -125,26 +127,18 @@ class Type():
         self.reference = False
         return self
 
-    def to_return_type(self) -> Type:
-        assert self.get_kind() == TypeKind.FUNCTION
-        self.func_params = None
-        self.generics_type_list = []
-        self.symbol_table = None
-        self.unfinished_node = None
-        return self
-
     def clone(self) -> Type:
         temp_type = Type(basic_type=self.basic_type,
                          generic_name=self.generic_name,
                          generic_type_range=self.generic_type_range,
                          struct_name=self.struct_name,
-                         is_interface=self.is_interface)
+                         is_interface=self.is_interface,
+                         func_ret_type=self.func_ret_type)
         temp_type.is_const = self.is_const
         temp_type.base_type_list = [*self.base_type_list]
         temp_type.array_dims = [*self.array_dims]
         temp_type.reference = self.reference
-        if self.func_params is not None:
-            temp_type.func_params = [*self.func_params]
+        temp_type.func_params = [*self.func_params]
         temp_type.generics_type_list = [*self.generics_type_list]
         temp_type.symbol_table = self.symbol_table
         temp_type.unfinished_node = self.unfinished_node
@@ -169,13 +163,12 @@ class Type():
         elif kind1 == TypeKind.REFERENCE and kind2 == TypeKind.REFERENCE:
             return self.clone().remove_ref() == type.clone().remove_ref()
         elif kind1 == TypeKind.FUNCTION and kind2 == TypeKind.FUNCTION:
-            ret_type_eq = self.clone().to_return_type() == type.clone().to_return_type()
-            if not ret_type_eq:
+            if not (self.func_ret_type == type.func_ret_type):
                 return False
             if len(self.func_params) != len(type.func_params):
                 return False
             for param1, param2 in zip(self.func_params, type.func_params):
-                if not (param1 == param2):
+                if not (param1.type == param2.type):
                     return False
             return True
 
@@ -215,7 +208,7 @@ class Type():
                 if i > 0:
                     func_str += ', '
                 func_str += f'{param.type}'
-            func_str += f') -> {self.clone().to_return_type()}'
+            func_str += f') -> {self.func_ret_type}'
             return func_str
         else:
             assert False
@@ -253,12 +246,12 @@ class Type():
         elif kind == TypeKind.REFERENCE:
             refered_ir_type = self.clone().remove_ref().to_ir_type()
             return ir.PointerType(refered_ir_type)
-        elif kind == TypeKind.FUNCTION:
-            ret_ir_type = self.clone().to_return_type().to_ir_type()
+        elif kind == TypeKind.FUNCTION:  # Return Function Pointer IR type
+            ret_ir_type = self.func_ret_type.to_ir_type()
             param_ir_types = []
             for param in self.func_params:
                 param_ir_types.append(param.type.to_ir_type())
-            return ir.FunctionType(ret_ir_type, param_ir_types)
+            return ir.PointerType(ir.FunctionType(ret_ir_type, param_ir_types))
         else:
             assert False, "uninstantiabled type!"
 

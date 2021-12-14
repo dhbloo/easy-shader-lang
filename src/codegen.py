@@ -25,6 +25,7 @@ class CodeGenContext():
         self.current_value : ir.Value = None
         self.current_break_block : ir.Block = None
         self.current_continue_block : ir.Block = None
+        self.current_object_value : ir.Value = None
         self.create_global_init_function()
 
     def create_global_init_function(self):
@@ -162,6 +163,7 @@ class CodeGenVisitor():
         # 增加 const 标记
         if node.is_const:
             var_type.add_const()
+        
 
         # 添加变量至符号表
         # 1. 对于全局变量，分配全局空间，需要在其initializer中加入初始化表达式
@@ -205,11 +207,12 @@ class CodeGenVisitor():
             node.block_stmt.accept(self)
 
             # 若该函数声明省略了返回值类型，推导其为返回表达式的类型
-            ret_type = func_type.clone().to_return_type()
+            ret_type = func_type.func_ret_type
             if ret_type.get_kind() == TypeKind.AUTO:
                 # 若没有返回语句，返回类型为VOID
                 ret_type = self.ctx.deduced_ret_type or Type(basic_type=BasicType.VOID)
                 # 替换返回值类型得到新函数类型
+                func_type.func_ret_type = ret_type
                 new_func_type = func_value.function_type
                 new_func_type.return_type = ret_type.to_ir_type()
                 # 重新构建函数值
@@ -225,6 +228,7 @@ class CodeGenVisitor():
                 if ret_type.get_kind() == TypeKind.BASIC and ret_type.basic_type == BasicType.VOID:
                     self.ctx.ir_builder.ret_void()
                 else:
+                    print(func_type)
                     raise SemanticError(f'must return a expression of type {ret_type} at the end of function')
 
             self.ctx.pop_scope()
@@ -284,7 +288,7 @@ class CodeGenVisitor():
         # 对于非泛型函数，此时可以构建ir.Function
         if not func_type.has_generics():
             # 若当前函数的返回值未指定，该函数值不会加入到模块中
-            if func_type.clone().to_return_type().get_kind() == TypeKind.AUTO:
+            if func_type.func_ret_type.get_kind() == TypeKind.AUTO:
                 module = ir.Module()
             else:
                 module = self.ctx.module
@@ -296,7 +300,7 @@ class CodeGenVisitor():
             else:
                 func_name = node.identifier
 
-            func_value = ir.Function(module, func_type.to_ir_type(), func_name)
+            func_value = ir.Function(module, func_type.to_ir_type().pointee, func_name)
         # 否则对于泛型函数，其符号值目前留空，等待实例化时再生成值
         else:
             func_value = None
@@ -312,10 +316,13 @@ class CodeGenVisitor():
         if node.return_type_spec:
             # 返回值从return_type_spec得到
             node.return_type_spec.accept(self)
-            func_type = self.ctx.current_type.clone()
+            ret_type = self.ctx.current_type.clone()
         else:
             # 返回值是Auto
-            func_type = Type()
+            ret_type = Type()
+
+        # 创建函数类型
+        func_type = Type(func_ret_type=ret_type)
 
         # 为函数建立符号表
         # 如果上层符号表是struct或interface的符号表，则跳过
@@ -333,7 +340,6 @@ class CodeGenVisitor():
             func_type.add_generics_type(self.ctx.current_type)
 
         # 处理函数的参数列表
-        param_list = []
         for param_idx, param in enumerate(node.parameter_decl_list):
             # 如果参数声明了具体类型，解析该类型
             if param.type_spec:
@@ -352,10 +358,7 @@ class CodeGenVisitor():
             # 获得参数的类型后，将符号加入到函数的符号表和参数列表中
             # 此时函数参数符号还没有值，需要等到后续的函数定义时才会产生值
             param_symbol = func_type.symbol_table.add_symbol(param.identifier, param_type)
-            param_list.append(param_symbol)
-
-        # 加入参数列表，组成函数类型
-        func_type.add_func_params(param_list)
+            func_type.add_func_param(param_symbol)
 
         # 函数签名的声明解析完毕，函数类型构建完成
         self.ctx.current_type = func_type
@@ -446,9 +449,10 @@ class CodeGenVisitor():
     def visit(self, node: ast.ConstructorFuncDefinition):
         # 检验构造函数的声明类型应该与当前结构体一样
         node.struct_type.accept(self)
-        if not (self.ctx.current_type == self.ctx.symbol_table.parent_type):
+        struct_type = self.ctx.current_type
+        if not (struct_type == self.ctx.symbol_table.parent_type):
             raise SemanticError('constructor must be of current struct type')
-        constructor_id = f'{self.ctx.current_type}'.replace(' ', '_')
+        constructor_id = f'{struct_type}'.replace(' ', '_')
         
         # 转换到一个普通的成员函数定义进行解析
         func_def_node = ast.FunctionDefinition(node.location, 
@@ -461,6 +465,9 @@ class CodeGenVisitor():
         func_ir_type : ir.FunctionType = func_symbol.value.function_type
         if func_ir_type.return_type != ir.VoidType():
             raise SemanticError('constructor return type must be void')
+
+        # 记录构造函数
+        struct_type.constructor = func_symbol
 
     @visitor.when(ast.DeclarationStatement)
     def visit(self, node: ast.DeclarationStatement):
@@ -620,7 +627,7 @@ class CodeGenVisitor():
 
     @visitor.when(ast.ReturnStatement)
     def visit(self, node: ast.ReturnStatement):
-        ret_type = self.ctx.symbol_table.parent_type.clone().to_return_type()
+        ret_type = self.ctx.symbol_table.parent_type.func_ret_type
         if node.expression:
             # 检查函数返回类型是否为void
             if ret_type.get_kind() == TypeKind.BASIC and ret_type.basic_type == BasicType.VOID:
@@ -642,6 +649,7 @@ class CodeGenVisitor():
             else:
                 cvt_success, ret_value = self.ctx.convert_type(ret_value_type, ret_type, ret_value)
                 if not cvt_success:
+                    print(ret_value_type, ret_type)
                     raise SemanticError(f'can not convert returned type {ret_value_type} to function return type {ret_type}')
 
             self.ctx.ir_builder.ret(ret_value)
@@ -898,11 +906,15 @@ class CodeGenVisitor():
             self.ctx.current_value = self.ctx.ir_builder.load(symbol.value)
         # 否则取出符号的变量值，并将类型修改为引用表示左值（除了函数值与常量）
         else:
-            if symbol.type.get_kind() == TypeKind.FUNCTION or symbol.type.is_const:
+            self.ctx.current_value = symbol.value
+            is_function = symbol.type.get_kind() == TypeKind.FUNCTION
+            if is_function or symbol.type.is_const:
                 self.ctx.current_type = symbol.type
+                # 对于函数类型的符号，如果其为函数值的指针，取出其对应的函数值
+                if is_function and isinstance(symbol.value.type.pointee, ir.PointerType):
+                    self.ctx.current_value = self.ctx.ir_builder.load(symbol.value)
             else:
                 self.ctx.current_type = symbol.type.clone().add_ref()
-            self.ctx.current_value = symbol.value
 
     @visitor.when(ast.ExpressionOperand)
     def visit(self, node: ast.ExpressionOperand):
@@ -928,24 +940,34 @@ class CodeGenVisitor():
         if member_symbol is None:
             raise SemanticError(f'no member named {node.member_id} in {obj_value_type}')
 
-        # 对于结构体引用类型，产生成员指针
-        if obj_type.get_kind() == TypeKind.REFERENCE:
-            assert type(member_symbol.value) is int
-            member_value = self.ctx.ir_builder.gep(obj_value, [
-                ir.IntType(32)(0), ir.IntType(32)(member_symbol.value),
-            ], inbounds=True)
+        # 若成员为成员函数
+        if member_symbol.type.get_kind() == TypeKind.FUNCTION:
+            member_value = member_symbol.value
+        # 否则为成员变量
         else:
-            raise NotImplementedError()
+            # 对于结构体引用类型，产生成员指针
+            if obj_type.get_kind() == TypeKind.REFERENCE:
+                assert type(member_symbol.value) is int
+                member_value = self.ctx.ir_builder.gep(obj_value, [
+                    ir.IntType(32)(0), ir.IntType(32)(member_symbol.value),
+                ], inbounds=True)
+            else:
+                raise NotImplementedError()
 
         # 若符号类型本身是引用，则先获取其指向的变量作为左值
         if member_symbol.type.get_kind() == TypeKind.REFERENCE:
             self.ctx.current_type = member_symbol.type
             self.ctx.current_value = self.ctx.ir_builder.load(member_value)
-        # 否则取出符号的变量值，并将类型修改为引用表示左值（除了函数值与常量）
+        # 否则取出符号的变量值，并将类型修改为引用表示左值（除了函数值）
         else:
-            assert member_symbol.type.get_kind() != TypeKind.FUNCTION
-            self.ctx.current_type = member_symbol.type.clone().add_ref()
+            if member_symbol.type.get_kind() != TypeKind.FUNCTION:
+                self.ctx.current_type = member_symbol.type.clone().add_ref()
+            else:
+                self.ctx.current_type = member_symbol.type
             self.ctx.current_value = member_value
+
+        # 保存当前的对象值
+        self.ctx.current_object_value = obj_value
 
     @visitor.when(ast.IndexExpression)
     def visit(self, node: ast.IndexExpression):
@@ -1065,7 +1087,31 @@ class CodeGenVisitor():
                 raise SemanticError(f'more than one parameters in basic type new expression')
         # 构造结构体类型（调用构造函数）
         elif new_type.get_kind() == TypeKind.STRUCT:
-            raise NotImplementedError()
+            func_type, func_value = new_type.constructor.type, new_type.constructor.value
+
+            # 检查函数参数数量是否符合
+            n_args = len(node.param_list) + 1
+            if len(func_type.func_params) != n_args:
+                raise SemanticError(f'new expression must have the same number of parameters with constructor ({n_args} != {len(func_type.func_params)})')
+
+            # 创建临时对象变量
+            value = self.ctx.ir_builder.alloca(new_type.to_ir_type())
+
+            # 处理调用参数
+            param_values = [value]
+            for idx, (param_symbol, param) in enumerate(zip(func_type.func_params, node.param_list)):
+                param.accept(self)
+                param_type, param_value = self.ctx.current_type, self.ctx.current_value
+                cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)
+                if not cvt_success:
+                    raise SemanticError(f'can not convert {idx}th parameter type {param_type} to {param_symbol.type}')
+                param_values.append(param_value)
+
+            # 调用构造函数
+            self.ctx.ir_builder.call(func_value, param_values)
+
+            # 转换对象到右值
+            value = self.ctx.ir_builder.load(value)
         # 构造数组类型
         elif new_type.get_kind() == TypeKind.ARRAY:
             # 检查是否提供了过多的参数
@@ -1100,6 +1146,40 @@ class CodeGenVisitor():
 
         self.ctx.current_type = new_type
         self.ctx.current_value = value
+
+    @visitor.when(ast.CallExpression)
+    def visit(self, node: ast.CallExpression):
+        node.func_expr.accept(self)
+        func_type, func_value = self.ctx.current_type, self.ctx.current_value
+
+        # 检查调用值是否为函数类型
+        if func_type.get_kind() != TypeKind.FUNCTION:
+            raise SemanticError('call expression must be a function type')
+
+        # 检查函数参数数量是否符合
+        n_args = len(node.param_list)
+        if isinstance(node.func_expr, ast.MemberExpression):
+            n_args += 1
+        if len(func_type.func_params) != n_args:
+            raise SemanticError(f'call expression must have the same number of parameters with function ({n_args} != {len(func_type.func_params)})')
+
+        param_values = []
+        # 处理成员函数调用（在第一个参数增加self）
+        if isinstance(node.func_expr, ast.MemberExpression):
+            assert self.ctx.current_object_value is not None
+            param_values.append(self.ctx.current_object_value)
+
+        # 处理调用参数
+        for idx, (param_symbol, param) in enumerate(zip(func_type.func_params, node.param_list)):
+            param.accept(self)
+            param_type, param_value = self.ctx.current_type, self.ctx.current_value
+            cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)
+            if not cvt_success:
+                raise SemanticError(f'can not convert {idx}th parameter type {param_type} to {param_symbol.type}')
+            param_values.append(param_value)
+
+        self.ctx.current_value = self.ctx.ir_builder.call(func_value, param_values)
+        self.ctx.current_type = func_type.func_ret_type
 
     @visitor.when(ast.IOExpression)
     def visit(self, node: ast.IOExpression):

@@ -224,7 +224,7 @@ class FunctionSignature(Node):
         out += f'{ind+1}Parameters:\n'
         for parameter in self.parameter_decl_list:
             out += parameter.__str__(ind+2)
-        out += f'{ind+1}Return Type: {self.return_type_spec or "(Empty)"}\n'
+        out += f'{ind+1}Return Type: {self.return_type_spec.__str__(ind+2) if self.return_type_spec else "(Empty)"}\n'
         return out
 
 class ParameterDecl(Node):

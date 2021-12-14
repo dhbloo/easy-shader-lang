@@ -12,7 +12,18 @@ struct Position {
     }
 };
 
-func f(p : Position) -> Position {
-    return p;
+let a : Position = Position();
+
+func f() -> Position {
+    return Position();
 }
 
+func g(p : Position) {
+    let x = p.length_square;
+    return x(p) + p.length_square();
+}
+
+func main() -> f32 {
+    let b = ref(a);
+    return g(Position()) + g(a) + g(b);
+}

@@ -1,12 +1,24 @@
 func time() -> f32;
 func max(a : i32, b : i32) -> i32;
 
+let _rand = 0.0f;
+func rand() -> f32 {
+    # _rand = sin();
+    return _rand;
+}
+
 func inc_one(x : i32) -> i32 {
     return x + 1;
 }
 
-let _rand = 0.0f;
-func rand() -> f32 {
-    _rand = sin();
-    return _rand;
+func dec_one(x : i32) -> i32 {
+    return x - 1;
+}
+
+func warp(f : (x : i32) -> i32) -> (x : i32) -> i32 {
+    return f;
+}
+
+func calc(x : i32, f : (x : i32) -> i32) {
+    return warp(f)(x);
 }
