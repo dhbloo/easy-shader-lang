@@ -9,13 +9,22 @@ let c : bool = 1;
 let d : bool = 1;
 let e : bool = c || d;
 
-let f : i32 = 1;
-let g : i32 = 1;
+let f : i32 = i32();
+let g : i32 = i32(1);
 let h : i32 = f + g;
+
+let arr : i32[4] = i32[4]();
+let arr2 : i32[4] = i32[4](1, 2, 3, 4);
+let arr3 : i32[4] = i32[4](5, 6);
+let arr4 : i32[2][3] = i32[2][3](i32[3](1, 2, 3), i32[3](4, 5, 6));
 
 func deduce_ret_type(x : i64) {
     f = g = 1;
     return x + (i64)(f * 2 / g);
+}
+
+func deduce_ret_type_arr() {
+    return arr4;
 }
 
 func reference_test(x : i32, xp : i32 ref, yp : i32 ref) -> i32 ref {

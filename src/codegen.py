@@ -113,6 +113,7 @@ class CodeGenContext():
 class CodeGenVisitor():
     def __init__(self, context : CodeGenContext) -> None:
         self.ctx = context
+        print(Type(basic_type=BasicType.I32).add_array_dim(2).add_array_dim(3))
 
     @visitor.on('node')
     def visit(self, node):
@@ -134,6 +135,11 @@ class CodeGenVisitor():
 
     @visitor.when(ast.Declarator)
     def visit(self, node: ast.Declarator):
+        # 检查符号是否在该作用域重复定义
+        local_symbol = self.ctx.symbol_table.query_local_symbol(node.identifier)
+        if local_symbol is not None:
+            raise SemanticError(f'redefined variable {local_symbol.id}')
+
         # 解析(可选)定义类型
         if node.type_spec:
             node.type_spec.accept(self)
@@ -294,7 +300,13 @@ class CodeGenVisitor():
             func_type = Type()
 
         # 为函数建立符号表
-        func_type.add_symbol_table(self.ctx.symbol_table)
+        # 如果上层符号表是struct或interface的符号表，则跳过
+        if (self.ctx.symbol_table.parent_type is not None and 
+            self.ctx.symbol_table.parent_type.get_kind() in [TypeKind.STRUCT, TypeKind.INTERFACE]):
+            parent_symbol_table = self.ctx.symbol_table.parent
+        else:
+            parent_symbol_table = self.ctx.symbol_table
+        func_type.add_symbol_table(parent_symbol_table)
 
         # 处理泛型类型声明列表
         for generics_type in node.generics_type_list:
@@ -664,7 +676,7 @@ class CodeGenVisitor():
         basic_type = lhs_type.basic_type
         irb = self.ctx.ir_builder
         is_bool = basic_type == BasicType.BOOL
-        is_float = basic_type == BasicType.F16 or basic_type == BasicType.F32 or basic_type == BasicType.F64
+        is_float = basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
         is_integer = not is_bool and not is_float
         cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed
 
@@ -759,7 +771,6 @@ class CodeGenVisitor():
             raise NotImplementedError(f'binary op {node.operator} not implemented')
         self.ctx.current_value = value
         
-
     @visitor.when(ast.UnaryExpression)
     def visit(self, node: ast.UnaryExpression):
         # 解析表达式
@@ -779,7 +790,7 @@ class CodeGenVisitor():
         irb = self.ctx.ir_builder
         basic_type = type.basic_type
         is_bool = basic_type == BasicType.BOOL
-        is_float = basic_type == BasicType.F16 or basic_type == BasicType.F32 or basic_type == BasicType.F64
+        is_float = basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
         is_integer = not is_bool and not is_float
 
         if node.operator == UnaryOp.PLUS:
@@ -957,7 +968,7 @@ class CodeGenVisitor():
                 value_type, value = self.ctx.get_current_assignment_value(node.param_list[0])
                 cvt_success, value = self.ctx.convert_type(value_type, new_type, value)
                 if not cvt_success:
-                    raise SemanticError(f'can not convert type {value_type} to type {new_type}')
+                    raise SemanticError(f'can not convert type {value_type} to type {new_type} in new expression')
             else:
                 raise SemanticError(f'more than one parameters in basic type new expression')
         # 构造结构体类型（调用构造函数）
@@ -965,12 +976,37 @@ class CodeGenVisitor():
             raise NotImplementedError()
         # 构造数组类型
         elif new_type.get_kind() == TypeKind.ARRAY:
-            raise NotImplementedError()
+            # 检查是否提供了过多的参数
+            array_size = new_type.get_array_size()
+            if len(node.param_list) > array_size:
+                raise SemanticError(f'more than {array_size} element in array new expression')
+
+            # 构造数组初始化值
+            element_type = new_type.clone().to_element_type()
+            param_values = []
+            for param in node.param_list:
+                param.accept(self)
+                param_type, param_value = self.ctx.get_current_assignment_value(param)
+                cvt_success, param_value = self.ctx.convert_type(param_type, element_type, param_value)
+                if not cvt_success:
+                    raise SemanticError(f'can not convert type {param_type} to type {element_type} in array new expression')
+                param_values.append(param_value)
+            # 如果值没指定全，对于基本类型剩余的补0，否则报错      
+            if len(param_values) < array_size:
+                if element_type.get_kind() == TypeKind.BASIC:
+                    elem_ir_type = element_type.to_ir_type()
+                    for _ in range(len(param_values), array_size):
+                        param_values.append(elem_ir_type(0))
+                else:
+                    raise SemanticError(f'must specify {array_size} elements in array new expression (only {len(param_values)} now)')
+                  
+            value = new_type.to_ir_type()(param_values)
         elif new_type.get_kind() == TypeKind.INTERFACE:
             raise SemanticError(f'can not instantiate interface {new_type}')
         else:
             raise SemanticError(f'can not instantiate type {new_type}')
 
+        self.ctx.current_type = new_type
         self.ctx.current_value = value
 
     @visitor.when(ast.IOExpression)

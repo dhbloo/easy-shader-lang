@@ -98,7 +98,7 @@ class Type():
     def add_array_dim(self, size : int) -> Type:
         if self.reference:
             raise SemanticError('type of array element can not be reference')
-        self.array_dims.append(size)
+        self.array_dims.insert(0, size)
         return self
 
     def add_ref(self) -> Type:
@@ -115,6 +115,10 @@ class Type():
         assert self.get_kind() == TypeKind.ARRAY
         self.array_dims.pop()
         return self
+
+    def get_array_size(self) -> int:
+        assert self.get_kind() == TypeKind.ARRAY
+        return self.array_dims[-1]
 
     def remove_ref(self) -> Type:
         assert self.get_kind() == TypeKind.REFERENCE
@@ -178,7 +182,43 @@ class Type():
         return False
 
     def __str__(self) -> str:
-        return str(self.get_kind())
+        kind = self.get_kind()
+
+        def get_generic_str(self) -> str:
+            if not self.has_generics():
+                return ''
+            generic_str = '<'
+            for i, generics_type in enumerate(self.generics_type_list):
+                if i > 0:
+                    generic_str += ', '
+                generic_str += f'{generics_type}'
+            generic_str += '>'
+            return generic_str
+
+        if kind == TypeKind.AUTO:
+            return 'auto'
+        if kind == TypeKind.BASIC:
+            return self.basic_type.name
+        elif kind == TypeKind.GENERIC:
+            return self.generic_name
+        elif kind == TypeKind.STRUCT:
+            return f'struct {self.struct_name}{get_generic_str(self)}'
+        elif kind == TypeKind.ARRAY:
+            element_type = self.clone().to_element_type()
+            return f'[{self.get_array_size()}]{element_type}'
+        elif kind == TypeKind.REFERENCE:
+            refered_type = self.clone().remove_ref()
+            return f'{refered_type} ref'
+        elif kind == TypeKind.FUNCTION:
+            func_str = f'{get_generic_str(self)}('
+            for i, param in enumerate(self.func_params):
+                if i > 0:
+                    func_str += ', '
+                func_str += f'{param.type}'
+            func_str += f') -> {self.clone().to_return_type()}'
+            return func_str
+        else:
+            assert False
 
     def to_ir_type(self) -> ir.Type:
         kind = self.get_kind()
