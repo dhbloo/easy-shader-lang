@@ -1,19 +1,68 @@
-struct A <Q> {
-    x : Q;
-    func ff<U>(self, y : U) -> Q {
-        return self.x + (Q)y;
+type vec3 = f32[3];
+# 泛型函数：交换变量
+func swap<T> (a : T ref, b : T ref) -> void {
+    let t : T = a;
+    a = b;
+    b = t;
+}
+
+# 射线结构体
+struct Ray {
+    o : vec3;  # 射线原点
+    d : vec3;  # 射线方向
+    func Ray(self, o : vec3, d : vec3) { self.o = o; self.d = d; }
+};
+
+# 几何体接口
+interface Geometry {
+    func intersect(r : Ray) -> bool;  # 判断几何体与射线是否相交
+};
+
+# 球体继承几何体接口
+struct Sphere : Geometry {
+    center : vec3;  # 球心
+    radius : f32;   # 半径
+    func Sphere(self, c, r) { self.center = c; self.radius = r; }
+    func intersect(self, r : Ray) -> bool {
+        let oc = r.o - self.center;
+        let d = dot(r.d, oc);
+        if (d > 0) return false;
+        return d * d - dot(oc, oc) + self.radius * self.radius >= 0;
     }
 };
 
-struct F {
-    a : i32;
-    b : f32;
-    func call(self, x : A<i32>, y:A<i32>) {
-        return x + y + self.a + (i32)self.b;
+# 立方体继承几何体接口
+struct Box : Geometry {
+    minp : vec3;  # 起始坐标
+    maxp : vec3;  # 结束坐标
+    func Sphere(self, c, r) { self.center = c; self.radius = r; }
+    func intersect(self, r : Ray) -> bool {
+        let tmin : f32 = (minp[0] - r.o[0]) / r.d[0];
+        let tmax : f32 = (maxp[0] - r.o[0]) / r.d[0];
+        if (tmin > tmax) swap(tmin, tmax);
+    
+        let tymin : f32 = (minp[1] - r.o[1]) / r.d[1];
+        let tymax : f32 = (maxp[1] - r.o[1]) / r.d[1];
+        if (tymin > tymax) swap(tymin, tymax);
+        if ((tmin > tymax) || (tymin > tmax)) return false;
+        if (tymin > tmin) tmin = tymin;
+        if (tymax < tmax) tmax = tymax;
+        
+        let tzmin : f32 = (minp[2] - r.o[2]) / r.d[2];
+        let tzmax : f32 = (maxp[2] - r.o[2]) / r.d[2];
+        if (tzmin > tzmax) swap(tzmin, tzmax);
+        if ((tmin > tzmax) || (tzmin > tmax)) return false;
+        if (tzmin > tmin) tmin = tzmin;
+        if (tzmax < tmax) tmax = tzmax;
+    
+        return true;
     }
 };
 
-interface Geometry {};
-interface Drawable {};
-
-struct Sphere<T> : Geometry, Drawable {};
+# 根据光线与几何体是否相交，着色函数返回不同的颜色
+func shade<T : Geometry>(g : T, ray : Ray) -> vec3 {
+    if (g.intersect(ray))
+        return vec3(1.0f, 0.0f, 0.0f);
+    else
+        return vec3(0.0f, 0.0f, 0.0f);
+}
