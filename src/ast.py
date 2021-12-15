@@ -289,7 +289,9 @@ class StructDecl(TypeDeclaration):
         out = f'{ind}Struct Declaration:\n{ind+1}ID: {self.identifier}\n{ind+1}Generic Types:\n'
         for generic_type in self.generics_type_list:
             out += generic_type.__str__(ind+2)
-        out += f'{ind+1}Base Type: {self.base_type or "(Empty)"}\n'
+        out += f'{ind+1}Base Type:\n'
+        for i, base in enumerate(self.base_type):
+            out += f'{ind+2}[{i}]: {base.__str__(ind+3)}\n'
         out += f'{ind+1}Members:\n'
         for member in self.member_decl_list:
             out += member.__str__(ind+2)
