@@ -7,6 +7,7 @@ from .type import Type
 
 
 class Symbol():
+    """单个符号，包含标识符，类型和LLVm IR值"""
     def __init__(self, id : str, type : Type, value : Optional[ir.Value | int]) -> None:
         self.id = id
         self.type = type
@@ -14,6 +15,7 @@ class Symbol():
 
 
 class SymbolTable():
+    """符号表，需要记录其父符号表的引用和域类型（函数或结构体）"""
     def __init__(self, parent : Optional[SymbolTable], parent_type : Optional[Type]) -> None:
         self.parent = parent
         self.parent_type = parent_type
