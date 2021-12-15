@@ -152,8 +152,15 @@ class ComplexType(TypeSpecifier):
 
     def __str__(self, ind=Indent()) -> str:
         type_class = 'interface' if self.is_interface else 'struct'
-        gslist = f' {self.generics_spec_list} ' if self.generics_spec_list else ' '
-        return f'{type_class}{gslist}({self.identifier})'
+        if len(self.generics_spec_list) > 0:
+            gs_str = '['
+            for i, gs in enumerate(self.generics_spec_list):
+                if i > 0: gs_str += ', '
+                gs_str += f'{gs.__str__(ind+1)}'
+            gs_str += ']'
+        else:
+            gs_str = ''
+        return f'{type_class} {gs_str} ({self.identifier})'
 
 class AliasType(TypeSpecifier):
     def __init__(self, loc, type : str) -> None:

@@ -12,6 +12,7 @@ U_BASICTYPES = [BasicType.U8, BasicType.U16, BasicType.U32, BasicType.U64]
 F_BASICTYPES = [BasicType.F16, BasicType.F32, BasicType.F64]
 
 class CodeGenContext():
+    """代码生成上下文"""
     def __init__(self, module_name) -> None:
         self.module = ir.Module(name=module_name)
         self.visitor = CodeGenVisitor(self)
@@ -29,6 +30,7 @@ class CodeGenContext():
         self.create_global_init_function()
 
     def create_global_init_function(self):
+        """创建全局初始化函数"""
         self.init_func_type = ir.FunctionType(ir.VoidType(), ())
         self.init_func = ir.Function(self.module, self.init_func_type, "__init__")
         block = self.init_func.append_basic_block('entry')
@@ -94,6 +96,7 @@ class CodeGenContext():
         return False, None
 
     def get_current_assignment_value(self, node : ast.Node) -> Tuple[Type, ir.Value]:
+        """获得当前需要赋值的值"""
         type, value = self.current_type, self.current_value
         assert type and value
 
@@ -228,7 +231,6 @@ class CodeGenVisitor():
                 if ret_type.get_kind() == TypeKind.BASIC and ret_type.basic_type == BasicType.VOID:
                     self.ctx.ir_builder.ret_void()
                 else:
-                    print(func_type)
                     raise SemanticError(f'must return a expression of type {ret_type} at the end of function')
 
             self.ctx.pop_scope()
@@ -649,7 +651,6 @@ class CodeGenVisitor():
             else:
                 cvt_success, ret_value = self.ctx.convert_type(ret_value_type, ret_type, ret_value)
                 if not cvt_success:
-                    print(ret_value_type, ret_type)
                     raise SemanticError(f'can not convert returned type {ret_value_type} to function return type {ret_type}')
 
             self.ctx.ir_builder.ret(ret_value)

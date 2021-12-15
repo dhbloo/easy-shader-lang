@@ -18,9 +18,9 @@ struct Cartesian<T> {
 # 坐标系类型：球坐标系
 struct Spherical<T> {  
     r : T;
-    theta : T;
-    phi : T;
-    func Cart(self, r : T, theta : T, phi : T) { self.r = r; self.theta = theta; self.phi = phi; }
+    theta : f32;
+    phi : f32;
+    func Cart(self, r : T, theta : f32, phi : f32) { self.r = r; self.theta = theta; self.phi = phi; }
 };
 # 定义从M到CM的转换函数
 convert<T>(m : M<T>) -> CM<T> {  
@@ -31,17 +31,18 @@ convert<T>(m : CM<T>) -> M<T> {
     return M<T>(m.length / 100);
 }
 # 定义直角坐标系到球坐标系的转换函数
-convert<T>(c : Cartesian<T>) -> Spherical<T> {  
-    let r : T = sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
-    let theta : T = arccos(c.z / r);
-    let phi : T = arctan(c.y / c.x);
+convert<T>(c : Cartesian<T>) -> Spherical<T> {
+    let x = c.x.length, y = c.y.length, z = c.z.length;
+    let r = T(sqrt(x * x + y * y + z * z));
+    let theta : f32 = arccos(z / r);
+    let phi : f32 = arctan(y / x);
     return Spherical<T>(r, theta, phi);
 }
 # 定义球坐标系到直角坐标系的转换函数
 convert<T>(c : Spherical<T>) -> Cartesian<T> {  
-    let x : T = c.r * sin(c.theta) * cos(c.phi);
-    let y : T = c.r * sin(c.theta) * sin(c.phi);
-    let z : T = c.r * cos(c.phi);
+    let x = T(c.r.length * sin(c.theta) * cos(c.phi));
+    let y = T(c.r.length * sin(c.theta) * sin(c.phi));
+    let z = T(c.r.length * cos(c.phi));
     return Cartesian<T>(x, y, z);
 }
 
