@@ -1,11 +1,29 @@
-func map<T>(array : T[] ref, mapper : (a:T) -> T) {
-    for (i = 0; i < array.len(); i = i + 1) {
+# 泛型map函数，编译器根据函数实参自动推导泛型参数T, F
+# 参数array被限定为一个T类型数组的引用
+func map<T, F>(array : T[] ref, mapper : F) {
+    for (i = 0; i < array.len; i = i + 1) {
         array[i] = mapper(array[i]);
     }
 }
 
-func lambda_test() {
-    let arr = i32[8](1, 2, 3);
-    map(arr, func(x) { return x * x; });
+# 对于未指定返回值的函数，编译器自动推导其返回值类型(i32)
+func square(x : i32) {
+    return x * x;
+}
+
+func main() {
+    let arr = i32[8](1, 2, 3, 4, 5, 6, 7, 8);
+    let c = 10;
+    # 可以使用全局函数作为参数
+    map(arr, square);  
+    # 也可以使用lambda函数
+    map(arr, func(x : i32) -> i32 { return x * x; });
+    # 指定显式泛型类型T
     map(arr, func<T>(x : T) -> T { return x * x; });
+    # 对于未指定类型的函数参数，当作匿名泛型类型处理
+    map(arr, func(x) { return x * x; });
+    # lambda可以捕获闭包，默认以值复制的方式引用
+    map(arr, func(x) { return x * x + c; });
+    # 闭包也可以捕获引用，用ref()表达式包括的变量
+    map(arr, func(x) { return x * x + ref(c); });
 }

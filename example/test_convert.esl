@@ -1,24 +1,65 @@
-struct Meter <T> {
+# 单位类型：米
+struct M <T> {  
     length : T;
-    func Meter(self, l : T) {
-        self.length = l;
-    }
+    func M(self, l : T) { self.length = l; }
 };
-
-struct CentiMeter <B> {
-    length : B;
-    func CentiMeter (self, l : B) {
-        self.length = l;
-    }
+# 单位类型：厘米
+struct CM <T> {  
+    length : T;
+    func CM (self, l : T) { self.length = l; }
 };
-
-convert<T>(m : Meter<T>) -> CentiMeter<T>  {
-    return CentiMeter<T>(m.length * 100);
+# 坐标系类型：直角坐标系
+struct Cartesian<T> {  
+    x : T;
+    y : T;
+    z : T;
+    func Cart(self, x : T, y : T, z : T) { self.x = x; self.y = y; self.z = z; }
+};
+# 坐标系类型：球坐标系
+struct Spherical<T> {  
+    r : T;
+    theta : T;
+    phi : T;
+    func Cart(self, r : T, theta : T, phi : T) { self.r = r; self.theta = theta; self.phi = phi; }
+};
+# 定义从M到CM的转换函数
+convert<T>(m : M<T>) -> CM<T> {  
+    return CM<T>(m.length * 100);
+}
+# 定义从CM到M的转换函数
+convert<T>(m : CM<T>) -> M<T> {  
+    return M<T>(m.length / 100);
+}
+# 定义直角坐标系到球坐标系的转换函数
+convert<T>(c : Cartesian<T>) -> Spherical<T> {  
+    let r : T = sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
+    let theta : T = arccos(c.z / r);
+    let phi : T = arctan(c.y / c.x);
+    return Spherical<T>(r, theta, phi);
+}
+# 定义球坐标系到直角坐标系的转换函数
+convert<T>(c : Spherical<T>) -> Cartesian<T> {  
+    let x : T = c.r * sin(c.theta) * cos(c.phi);
+    let y : T = c.r * sin(c.theta) * sin(c.phi);
+    let z : T = c.r * cos(c.phi);
+    return Cartesian<T>(x, y, z);
 }
 
-convert<T>(m : CentiMeter<T>) -> Meter<T>  {
-    return Meter<T>(m.length * 100);
+# 定义类型别称简化书写
+type CartCM = Cartesian< CM<f32> >;
+type SpherM = Spherical< M<f32> >;
+
+# 求以厘米为单位的直角坐标系中两个坐标的距离
+func distance(c1 : CartCM, c2 : CartCM) -> f32 {
+    let dx = c1.x.length - c2.x.length;
+    let dy = c1.y.length - c2.y.length;
+    let dz = c1.z.length - c2.z.length;
+    return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-
-convert (a : CentiMeter) -> Meter;
+func main() {
+    let a = SpherM(4.0f, 1.0f, 2.0f);
+    let b = CartCM(300.0f, 250.0f, 400.0f);
+    # 此处发生自动类型转换SpherM -> CartCM，实现坐标系与单位的语义转换
+    let d = distance(a, b);  
+}
