@@ -6,7 +6,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.lexer import *
 
 arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+arg_parser.add_argument("file", nargs='?', type=argparse.FileType(
+    'r', encoding='utf8'), default=sys.stdin)
 args = arg_parser.parse_args()
 
 lexer = lex.lex()

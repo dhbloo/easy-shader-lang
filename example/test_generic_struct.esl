@@ -1,27 +1,27 @@
 type vec3 = f32[3];
-# ·ºĞÍº¯Êı£º½»»»±äÁ¿
+# æ³›å‹å‡½æ•°ï¼šäº¤æ¢å˜é‡
 func swap<T> (a : T ref, b : T ref) -> void {
     let t : T = a;
     a = b;
     b = t;
 }
 
-# ÉäÏß½á¹¹Ìå
+# å°„çº¿ç»“æ„ä½“
 struct Ray {
-    o : vec3;  # ÉäÏßÔ­µã
-    d : vec3;  # ÉäÏß·½Ïò
+    o : vec3;  # å°„çº¿åŸç‚¹
+    d : vec3;  # å°„çº¿æ–¹å‘
     func Ray(self, o : vec3, d : vec3) { self.o = o; self.d = d; }
 };
 
-# ¼¸ºÎÌå½Ó¿Ú
+# å‡ ä½•ä½“æ¥å£
 interface Geometry {
-    func intersect(r : Ray) -> bool;  # ÅĞ¶Ï¼¸ºÎÌåÓëÉäÏßÊÇ·ñÏà½»
+    func intersect(r : Ray) -> bool;  # åˆ¤æ–­å‡ ä½•ä½“ä¸å°„çº¿æ˜¯å¦ç›¸äº¤
 };
 
-# ÇòÌå¼Ì³Ğ¼¸ºÎÌå½Ó¿Ú
+# çƒä½“ç»§æ‰¿å‡ ä½•ä½“æ¥å£
 struct Sphere : Geometry {
-    center : vec3;  # ÇòĞÄ
-    radius : f32;   # °ë¾¶
+    center : vec3;  # çƒå¿ƒ
+    radius : f32;   # åŠå¾„
     func Sphere(self, c, r) { self.center = c; self.radius = r; }
     func intersect(self, r : Ray) -> bool {
         let oc = r.o - self.center;
@@ -31,10 +31,10 @@ struct Sphere : Geometry {
     }
 };
 
-# Á¢·½Ìå¼Ì³Ğ¼¸ºÎÌå½Ó¿Ú
+# ç«‹æ–¹ä½“ç»§æ‰¿å‡ ä½•ä½“æ¥å£
 struct Box : Geometry {
-    minp : vec3;  # ÆğÊ¼×ø±ê
-    maxp : vec3;  # ½áÊø×ø±ê
+    minp : vec3;  # èµ·å§‹åæ ‡
+    maxp : vec3;  # ç»“æŸåæ ‡
     func Sphere(self, c, r) { self.center = c; self.radius = r; }
     func intersect(self, r : Ray) -> bool {
         let tmin : f32 = (minp[0] - r.o[0]) / r.d[0];
@@ -59,7 +59,7 @@ struct Box : Geometry {
     }
 };
 
-# ¸ù¾İ¹âÏßÓë¼¸ºÎÌåÊÇ·ñÏà½»£¬×ÅÉ«º¯Êı·µ»Ø²»Í¬µÄÑÕÉ«
+# æ ¹æ®å…‰çº¿ä¸å‡ ä½•ä½“æ˜¯å¦ç›¸äº¤ï¼Œç€è‰²å‡½æ•°è¿”å›ä¸åŒçš„é¢œè‰²
 func shade<T : Geometry>(g : T, ray : Ray) -> vec3 {
     if (g.intersect(ray))
         return vec3(1.0f, 0.0f, 0.0f);

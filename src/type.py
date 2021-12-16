@@ -82,10 +82,10 @@ class Type():
     def add_generics_type(self, generics_type : Type) -> Type:
         assert generics_type.get_kind() == TypeKind.GENERIC
         self.generics_type_list.append(generics_type)
-        if len(generics_type.generic_name) > 0:
-            self.symbol_table.add_type(generics_type.generic_name, generics_type)
-        else:
-            self.symbol_table.add_unnamed_type(generics_type)
+        # if len(generics_type.generic_name) > 0:
+        #     self.symbol_table.add_type(generics_type.generic_name, generics_type)
+        # else:
+        #     self.symbol_table.add_unnamed_type(generics_type)
         return self
 
     def add_struct_base_type(self, base_type : Type) -> Type:

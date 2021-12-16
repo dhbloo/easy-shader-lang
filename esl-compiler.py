@@ -10,7 +10,7 @@ def run():
     arg_parser.add_argument("--ast_only", type=bool, default=False)
     args = arg_parser.parse_args()
 
-    with open(args.source_file, 'r') as f:
+    with open(args.source_file, 'r', encoding='utf8') as f:
         code_str = f.read()
 
     compiler = Compiler(ast_only=args.ast_only)
