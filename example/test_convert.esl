@@ -13,22 +13,22 @@ struct Cartesian<T> {
     x : T;
     y : T;
     z : T;
-    func Cart(self, x : T, y : T, z : T) { self.x = x; self.y = y; self.z = z; }
+    func Cartesian(self, x : T, y : T, z : T) { self.x = x; self.y = y; self.z = z; }
 };
 # 坐标系类型：球坐标系
 struct Spherical<T> {  
     r : T;
     theta : f32;
     phi : f32;
-    func Cart(self, r : T, theta : f32, phi : f32) { self.r = r; self.theta = theta; self.phi = phi; }
+    func Spherical(self, r : T, theta : f32, phi : f32) { self.r = r; self.theta = theta; self.phi = phi; }
 };
 # 定义从M到CM的转换函数
 convert<T>(m : M<T>) -> CM<T> {  
-    return CM<T>(m.length * 100);
+    return CM<T>(m.length * (T)100);
 }
 # 定义从CM到M的转换函数
 convert<T>(m : CM<T>) -> M<T> {  
-    return M<T>(m.length / 100);
+    return M<T>(m.length / (T)100);
 }
 # 定义直角坐标系到球坐标系的转换函数
 convert<T>(c : Cartesian<T>) -> Spherical<T> {
