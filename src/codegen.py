@@ -15,6 +15,7 @@ class CodeGenContext():
     """代码生成上下文"""
     def __init__(self, module_name) -> None:
         self.module = ir.Module(name=module_name)
+        self.module.triple = "spir64-unknown-unknown"
         self.visitor = CodeGenVisitor(self)
 
         self.scope_stack : List[Tuple[SymbolTable, ir.IRBuilder, Type]] = []
@@ -719,21 +720,11 @@ class CodeGenVisitor():
     def visit(self, node: ast.BinaryExpression):
         # 解析左表达式
         node.lhs_expr.accept(self)
-        lhs_type, lhs_value = self.ctx.current_type, self.ctx.current_value
+        lhs_type, lhs_value = self.ctx.get_current_assignment_value(node.lhs_expr)
 
         # 解析右表达式
         node.rhs_expr.accept(self)
-        rhs_type, rhs_value = self.ctx.current_type, self.ctx.current_value
-
-        if (lhs_type.get_kind() == TypeKind.REFERENCE):
-            lhs_value_type = lhs_type.clone().remove_ref()
-            _, lhs_value = self.ctx.convert_type(lhs_type, lhs_value_type, lhs_value)
-            lhs_type = lhs_value_type
-
-        if (rhs_type.get_kind() == TypeKind.REFERENCE):
-            rhs_value_type = rhs_type.clone().remove_ref()
-            _, rhs_value = self.ctx.convert_type(rhs_type, rhs_value_type, rhs_value)
-            rhs_type = rhs_value_type
+        rhs_type, rhs_value = self.ctx.get_current_assignment_value(node.rhs_expr)
 
         # 检查左右表达式类型一致
         if not lhs_type == rhs_type:
@@ -794,6 +785,8 @@ class CodeGenVisitor():
                     value = irb.srem(lhs_value, rhs_value)
                 else:
                     value = irb.urem(lhs_value, rhs_value)
+            elif is_float:
+                value = irb.frem(lhs_value, rhs_value)
             else:
                 raise SemanticError('unsupported type of MOD')
         elif node.operator == BinaryOp.LSHIFT:  # <<
@@ -846,18 +839,14 @@ class CodeGenVisitor():
     def visit(self, node: ast.UnaryExpression):
         # 解析表达式
         node.expression.accept(self)
-        type, value = self.ctx.current_type, self.ctx.current_value
-
-        if type.get_kind() == TypeKind.REFERENCE:
-            value_type = type.clone().remove_ref()
-            _, value = self.ctx.convert_type(type, value_type, value)
-            type = value_type
+        type, value = lhs_type, lhs_value = self.ctx.get_current_assignment_value(node.expression)
 
         # 检查操作数类型可运算（整形或浮点型）
         if type.get_kind() != TypeKind.BASIC:
             raise SemanticError(f'unsupported type of unary operands')
 
         # 生成运算指令
+        self.ctx.current_type = type
         irb = self.ctx.ir_builder
         basic_type = type.basic_type
         is_bool = basic_type == BasicType.BOOL
@@ -909,7 +898,7 @@ class CodeGenVisitor():
         else:
             self.ctx.current_value = symbol.value
             is_function = symbol.type.get_kind() == TypeKind.FUNCTION
-            if is_function or symbol.type.is_const:
+            if is_function:
                 self.ctx.current_type = symbol.type
                 # 对于函数类型的符号，如果其为函数值的指针，取出其对应的函数值
                 if is_function and isinstance(symbol.value.type.pointee, ir.PointerType):

@@ -98,7 +98,10 @@ class Type():
         return self
 
     def add_array_dim(self, size : int) -> Type:
-        if self.reference:
+        kind = self.get_kind()
+        if kind == TypeKind.BASIC and self.basic_type == BasicType.VOID:
+            raise SemanticError('can not create array of void')
+        if kind == TypeKind.REFERENCE:
             raise SemanticError('type of array element can not be reference')
         self.array_dims.insert(0, size)
         return self

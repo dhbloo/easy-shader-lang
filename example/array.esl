@@ -8,10 +8,14 @@ func array_test(x : i32) -> i32 {
     return arr[x];
 }
 
-func array_test2(x : i32) -> i32[3] {
+func array_test2(x : i32) -> i32 ref {
+    return ref(arr[x]);
+}
+
+func array_test3(x : i32) -> i32[3] {
     return arr4[x];
 }
 
-func array_test3(x : i32) -> i32[3] ref {
+func array_test4(x : i32) -> i32[3] ref {
     return ref(arr4[x]);
 }

@@ -18,7 +18,7 @@ lexer = create_lexer()
 parser = create_parser()
 
 arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+arg_parser.add_argument("file", nargs='?', type=argparse.FileType('r', encoding='utf8'), default=sys.stdin)
 args = arg_parser.parse_args()
 with args.file as f:
     program_str = f.read()

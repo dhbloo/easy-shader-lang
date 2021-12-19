@@ -1,36 +1,36 @@
-# µ¥Î»ÀàĞÍ£ºÃ×
+# å•ä½ç±»å‹ï¼šç±³
 struct M <T> {  
     length : T;
     func M(self, l : T) { self.length = l; }
 };
-# µ¥Î»ÀàĞÍ£ºÀåÃ×
+# å•ä½ç±»å‹ï¼šå˜ç±³
 struct CM <T> {  
     length : T;
     func CM (self, l : T) { self.length = l; }
 };
-# ×ø±êÏµÀàĞÍ£ºÖ±½Ç×ø±êÏµ
+# åæ ‡ç³»ç±»å‹ï¼šç›´è§’åæ ‡ç³»
 struct Cartesian<T> {  
     x : T;
     y : T;
     z : T;
-    func Cart(self, x : T, y : T, z : T) { self.x = x; self.y = y; self.z = z; }
+    func Cartesian(self, x : T, y : T, z : T) { self.x = x; self.y = y; self.z = z; }
 };
-# ×ø±êÏµÀàĞÍ£ºÇò×ø±êÏµ
+# åæ ‡ç³»ç±»å‹ï¼šçƒåæ ‡ç³»
 struct Spherical<T> {  
     r : T;
     theta : f32;
     phi : f32;
-    func Cart(self, r : T, theta : f32, phi : f32) { self.r = r; self.theta = theta; self.phi = phi; }
+    func Spherical(self, r : T, theta : f32, phi : f32) { self.r = r; self.theta = theta; self.phi = phi; }
 };
-# ¶¨Òå´ÓMµ½CMµÄ×ª»»º¯Êı
+# å®šä¹‰ä»Måˆ°CMçš„è½¬æ¢å‡½æ•°
 convert<T>(m : M<T>) -> CM<T> {  
-    return CM<T>(m.length * 100);
+    return CM<T>(m.length * (T)100);
 }
-# ¶¨Òå´ÓCMµ½MµÄ×ª»»º¯Êı
+# å®šä¹‰ä»CMåˆ°Mçš„è½¬æ¢å‡½æ•°
 convert<T>(m : CM<T>) -> M<T> {  
-    return M<T>(m.length / 100);
+    return M<T>(m.length / (T)100);
 }
-# ¶¨ÒåÖ±½Ç×ø±êÏµµ½Çò×ø±êÏµµÄ×ª»»º¯Êı
+# å®šä¹‰ç›´è§’åæ ‡ç³»åˆ°çƒåæ ‡ç³»çš„è½¬æ¢å‡½æ•°
 convert<T>(c : Cartesian<T>) -> Spherical<T> {
     let x = c.x.length, y = c.y.length, z = c.z.length;
     let r = T(sqrt(x * x + y * y + z * z));
@@ -38,7 +38,7 @@ convert<T>(c : Cartesian<T>) -> Spherical<T> {
     let phi : f32 = arctan(y / x);
     return Spherical<T>(r, theta, phi);
 }
-# ¶¨ÒåÇò×ø±êÏµµ½Ö±½Ç×ø±êÏµµÄ×ª»»º¯Êı
+# å®šä¹‰çƒåæ ‡ç³»åˆ°ç›´è§’åæ ‡ç³»çš„è½¬æ¢å‡½æ•°
 convert<T>(c : Spherical<T>) -> Cartesian<T> {  
     let x = T(c.r.length * sin(c.theta) * cos(c.phi));
     let y = T(c.r.length * sin(c.theta) * sin(c.phi));
@@ -46,11 +46,11 @@ convert<T>(c : Spherical<T>) -> Cartesian<T> {
     return Cartesian<T>(x, y, z);
 }
 
-# ¶¨ÒåÀàĞÍ±ğ³Æ¼ò»¯ÊéĞ´
+# å®šä¹‰ç±»å‹åˆ«ç§°ç®€åŒ–ä¹¦å†™
 type CartCM = Cartesian< CM<f32> >;
 type SpherM = Spherical< M<f32> >;
 
-# ÇóÒÔÀåÃ×Îªµ¥Î»µÄÖ±½Ç×ø±êÏµÖĞÁ½¸ö×ø±êµÄ¾àÀë
+# æ±‚ä»¥å˜ç±³ä¸ºå•ä½çš„ç›´è§’åæ ‡ç³»ä¸­ä¸¤ä¸ªåæ ‡çš„è·ç¦»
 func distance(c1 : CartCM, c2 : CartCM) -> f32 {
     let dx = c1.x.length - c2.x.length;
     let dy = c1.y.length - c2.y.length;
@@ -61,6 +61,6 @@ func distance(c1 : CartCM, c2 : CartCM) -> f32 {
 func main() {
     let a = SpherM(4.0f, 1.0f, 2.0f);
     let b = CartCM(300.0f, 250.0f, 400.0f);
-    # ´Ë´¦·¢Éú×Ô¶¯ÀàĞÍ×ª»»SpherM -> CartCM£¬ÊµÏÖ×ø±êÏµÓëµ¥Î»µÄÓïÒå×ª»»
+    # æ­¤å¤„å‘ç”Ÿè‡ªåŠ¨ç±»å‹è½¬æ¢SpherM -> CartCMï¼Œå®ç°åæ ‡ç³»ä¸å•ä½çš„è¯­ä¹‰è½¬æ¢
     let d = distance(a, b);  
 }
