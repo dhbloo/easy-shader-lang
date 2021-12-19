@@ -7,6 +7,7 @@ from src.compiler import Compiler
 def run():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("source_file", type=str)
+    arg_parser.add_argument("-o", type=str, default="", required=False)
     arg_parser.add_argument("--ast_only", type=bool, default=False)
     args = arg_parser.parse_args()
 
@@ -20,6 +21,10 @@ def run():
 
         if compiler.verify():
             print(colored('Compile success!', color='green'))
+
+            if args.o != "":
+                with open(args.o, 'wb') as f:
+                    compiler.dump_bitcode(f)
         else:
             print(colored('Error in IR code', color='red'))
             print(colored(f'Error: {compiler.get_error_message()}', color='yellow'))

@@ -1,4 +1,4 @@
-from io import TextIOBase
+from io import TextIOBase, IOBase
 from termcolor import colored
 from llvmlite import ir
 import llvmlite.binding as llvm
@@ -60,6 +60,16 @@ class Compiler():
 
     def dump_text(self, out_stream : TextIOBase):
         out_stream.write(str(self.module))
+
+    def dump_bitcode(self, out_stream : IOBase):
+        try:
+            mod = llvm.parse_assembly(str(self.module))
+            bc = mod.as_bitcode()
+            out_stream.write(bc)
+        except Exception as err:
+            self.error_message = str(err)
+            return False
+        return True
 
     def create_execution_engine(self):
         """
