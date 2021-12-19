@@ -26,6 +26,12 @@ class SymbolTable():
     def is_root(self) -> bool:
         return self.parent is None
 
+    def get_root(self) -> Symbol:
+        if self.is_root():
+            return self
+        else:
+            return self.parent.get_root()
+
     def add_symbol(self, name : str, type : Type, value : Optional[ir.Value | int] = None) -> Symbol:
         if name in self.symbol_table:
             raise SemanticError(f'redefine symbol {name}')
@@ -68,8 +74,24 @@ class SymbolTable():
         else:
             return None
 
+    def replace_local_type(self, name : str, new_type : Type) -> Type:
+        if name not in self.type_table:
+            raise SemanticError(f'undefined local type {name}')
+        else:
+            self.type_table[name] = new_type
+            return self.type_table[name]
+
+    def replace_local_symbol_type(self, name : str, new_type : Type) -> Symbol:
+        if name not in self.symbol_table:
+            raise SemanticError(f'undefined local symbol {name}')
+        else:
+            self.symbol_table[name] = Symbol(self.symbol_table[name].id, 
+                                             new_type, self.symbol_table[name].value)
+            return self.symbol_table[name]
+
     def clone(self) -> SymbolTable:
         new_symbol_table = SymbolTable(self.parent, self.parent_type)
         new_symbol_table.type_table = dict(**self.type_table)
         new_symbol_table.symbol_table = dict(**self.symbol_table)
+        new_symbol_table.unnamed_index = self.unnamed_index
         return new_symbol_table
