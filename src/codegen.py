@@ -1246,7 +1246,7 @@ class CodeGenVisitor():
 
             # 处理调用参数
             param_values = [value]
-            for idx, (param_symbol, param) in enumerate(zip(func_type.func_params, node.param_list)):
+            for idx, (param_symbol, param) in enumerate(zip(func_type.func_params[1:], node.param_list)):
                 param.accept(self)
                 param_type, param_value = self.ctx.current_type, self.ctx.current_value
                 cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)

@@ -115,10 +115,10 @@ func cross(x : vec3, y : vec3) {
 }
 
 func noise(x : vec3) -> f32 {
-    x = floorv3(x);
+    let p = floorv3(x);
     let f = smoothstepv3(0.0f, 1.0f, fractv3(x));
 
-    let n : f32 = x[0] + x[1] * 10 + x[2] * 100;
+    let n : f32 = p[0] + p[1] * 10 + p[2] * 100;
 
     let v00 = mix(hash(n), hash(n+1), f[0]);
     let v01 = mix(hash(n+10), hash(n+11), f[0]);
