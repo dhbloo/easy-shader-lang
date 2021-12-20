@@ -1,11 +1,12 @@
 func test_auto_conversion() {
-    let a = (i8)1;
-    let b : i16 = a;
-    let c : i32 = b;
-    let d : i64 = c;
+    #let a = (i8)1;
+    #let b : i16 = a;
+    #let c : i32 = b;
+    #let d : f64 = c;
+    let f : i32 = 12 & 1;
 }
 
-func test_explicit_cast() {
-    let a = (f16)1;
-    let b : i64 = (i64)(1.0 + 2.0);
-}
+#func test_explicit_cast() {
+#    let a = (f16)1;
+#    let b : i64 = (i64)(1.0 + 2.0);
+#}

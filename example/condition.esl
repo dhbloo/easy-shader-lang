@@ -5,7 +5,7 @@ func is_equal(x : i64, y : i64) -> bool {
 }
 
 func max(x : f32, y : f32) {
-    if (y > x)
+    if (y < x)
         return y;
     else
         return x;

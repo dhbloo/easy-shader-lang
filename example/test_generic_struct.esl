@@ -1,5 +1,7 @@
 type vec3 = f32[3];
+
 # 泛型函数：交换变量
+
 func swap<T> (a : T ref, b : T ref) -> void {
     let t : T = a;
     a = b;
