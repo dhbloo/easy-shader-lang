@@ -1,0 +1,19 @@
+type vec4 = f32[4];
+type vec2 = f32[2];
+
+let outColor = vec4();
+
+let coord = vec2();
+let resolution = vec2();
+let time = f32();
+
+func main() {
+    outColor = vec4(0.4f, 0.4f, 0.8f, 1.0f);
+
+    let x = coord[0] / resolution[0];
+    let y = coord[1] / resolution[1];
+
+    outColor[0] = 0.5f + 0.5f * cos(x + time);
+    outColor[1] = 0.5f + 0.5f * cos(x + time + 2);
+    outColor[2] = 0.5f + 0.5f * cos(x + time + 4);
+}

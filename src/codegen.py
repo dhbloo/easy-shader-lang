@@ -34,7 +34,35 @@ class CodeGenContext():
         self.create_global_init_function()
 
     def declare_intrinsic(self):
-        self.module.declare_intrinsic("@llvm.fabs.f32", (), ir.FunctionType(ir.FloatType(), (ir.FloatType(),)))
+        """声明LLVM内置函数到符号表"""
+        def add_intrinsic(name, intrinsic, ret_t, args_t=()):
+            ft = Type()
+            ft.add_func_ret_type(ret_t)
+            ft.add_symbol_table(self.symbol_table)
+            for i, arg_t in enumerate(args_t):
+                p = ft.symbol_table.add_symbol(str(i), arg_t, None)
+                ft.add_func_param(p)
+            
+            fv = self.module.declare_intrinsic(intrinsic, fnty=ft.to_ir_type().pointee)
+            for i, param_symbol in enumerate(ft.func_params):
+                param_symbol.value = fv.args[i]
+            self.symbol_table.add_symbol(name, ft, fv)
+
+        float_t = Type(basic_type=BasicType.F32)
+        add_intrinsic("abs", "llvm.fabs.f32", float_t, (float_t,))
+        add_intrinsic("ceil", "llvm.ceil.f32", float_t, (float_t,))
+        add_intrinsic("floor", "llvm.floor.f32", float_t, (float_t,))
+        add_intrinsic("round", "llvm.round.f32", float_t, (float_t,))
+        add_intrinsic("trunc", "llvm.trunc.f32", float_t, (float_t,))
+        add_intrinsic("sin", "llvm.sin.f32", float_t, (float_t,))
+        add_intrinsic("cos", "llvm.cos.f32", float_t, (float_t,))
+        add_intrinsic("exp", "llvm.exp.f32", float_t, (float_t,))
+        add_intrinsic("exp2", "llvm.exp2.f32", float_t, (float_t,))
+        add_intrinsic("log", "llvm.log.f32", float_t, (float_t,))
+        add_intrinsic("log2", "llvm.log2.f32", float_t, (float_t,))
+        add_intrinsic("sqrt", "llvm.sqrt.f32", float_t, (float_t,))
+        add_intrinsic("pow", "llvm.pow.f32", float_t, (float_t, float_t))
+        add_intrinsic("modf", "llvm.modf.f32", float_t, (float_t, float_t))
 
     def create_global_init_function(self):
         """创建全局初始化函数"""
@@ -825,7 +853,7 @@ class CodeGenVisitor():
         is_bool = basic_type == BasicType.BOOL
         is_float = basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]  ######
         is_integer = not is_bool and not is_float
-        cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed  ######
+        cmp_instr = self.ctx.ir_builder.fcmp_ordered if is_float else self.ctx.ir_builder.icmp_signed  ######
         irb = self.ctx.ir_builder
 
         # is_bool_lmd_ = lambda bt: bt.value == BasicType.BOOL.value

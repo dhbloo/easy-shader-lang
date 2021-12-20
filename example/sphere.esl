@@ -3,14 +3,24 @@ type vec2 = f32[2];
 
 let outColor = vec4();
 
-let info = vec2();
+let coord = vec2();
+let resolution = vec2();
 let time = f32();
 
+func min(a, b) {
+    if (a <= b) return a; else return b;
+}
+
 func main() {
-    let x = info[0] - 0.5f;
-    let y = info[1] - 0.5f;
-    if (x * x + y * y < 0.25f)
-        outColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    else
-        outColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    outColor = vec4(0.0f, 0.0f, 0.0f, 0.1f);
+    let minRes = min(resolution[0], resolution[1]);
+
+    let sx = resolution[0] / 2 / minRes + 0.8f * sin(time);
+
+    let x = coord[0] / minRes - sx;
+    let y = coord[1] / minRes - 0.5f;
+    if (x * x + y * y < 0.1f) {
+        outColor[0] = abs(sin(time));
+        outColor[1] = abs(cos(time));
+    }
 }
