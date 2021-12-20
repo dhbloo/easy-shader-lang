@@ -799,17 +799,17 @@ class CodeGenVisitor():
             raise SemanticError(f'unsupported type of binary operands')
 
         # 生成运算指令
-        # self.ctx.current_type = lhs_type
-        # basic_type = lhs_type.basic_type
-        # is_bool = basic_type == BasicType.BOOL
-        # is_integer = not is_bool and not is_float
-        irb = self.ctx.ir_builder
-        is_float = lhs_type in [BasicType.F16, BasicType.F32, BasicType.F64]  ######
+        self.ctx.current_type = lhs_type
+        basic_type = lhs_type.basic_type
+        is_bool = basic_type == BasicType.BOOL
+        is_float = basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]  ######
+        is_integer = not is_bool and not is_float
         cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed  ######
+        irb = self.ctx.ir_builder
 
-        is_bool = lambda bt: bt.value == BasicType.BOOL.value
-        is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
-        is_float = lambda bt: bt.value >= BasicType.F16.value
+        # is_bool_lmd_ = lambda bt: bt.value == BasicType.BOOL.value
+        # is_integer_lmd = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
+        # is_float_lmd = lambda bt: bt.value >= BasicType.F16.value
 
         if node.operator == BinaryOp.PLUS:  # +
             if lhs_type.basic_type.value < rhs_type.basic_type.value:
@@ -832,9 +832,6 @@ class CodeGenVisitor():
                 self.ctx.current_type = lhs_type
                 is_float = lhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
             value = (irb.fsub if is_float else irb.sub)(lhs_value, rhs_value)
-
-
-
         elif node.operator == BinaryOp.MUL:  # *
             if lhs_type.basic_type.value < rhs_type.basic_type.value:
                 _, lhs_value = self.ctx.convert_type(lhs_type, rhs_type, lhs_value)
@@ -862,10 +859,6 @@ class CodeGenVisitor():
                 else:
                     value = irb.udiv(lhs_value, rhs_value)
         elif node.operator == BinaryOp.AND:  # &  只有bool和inter可以，且inter时必须要相同
-            # is_lhs_int_bool = is_bool(lhs_type.basic_type) or is_integer(lhs_type.basic_type)
-            # is_rhs_int_bool = is_bool(rhs_type.basic_type) or is_integer(rhs_type.basic_type)
-            # print(lhs_type.basic_type)
-            # print(rhs_type.basic_type)
             if is_integer:
                 value = irb.and_(lhs_value, rhs_value)
             else:
@@ -930,6 +923,7 @@ class CodeGenVisitor():
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
             value = cmp_instr('>=', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.GREATER:  # >
+            print('is_float', is_float)
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
             value = cmp_instr('>', lhs_value, rhs_value)  ######
         else:

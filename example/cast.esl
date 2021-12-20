@@ -3,7 +3,7 @@ func test_auto_conversion() {
     #let b : i16 = a;
     #let c : i32 = b;
     #let d : f64 = c;
-    let f : f64 = (1 / 11.1) + 13.0f;
+    let f : i32 = 12 & 1;
 }
 
 #func test_explicit_cast() {
