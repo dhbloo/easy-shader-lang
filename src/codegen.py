@@ -88,11 +88,33 @@ class CodeGenContext():
                 elif is_i_src and is_i_dst and (src_bt.value < dst_bt.value):
                     return True, self.ir_builder.sext(src_value, dst_type.to_ir_type())
             elif is_integer(src_bt) and dst_bt == BasicType.BOOL:
+                print('wwwwwwwwwwww')
                 return True, self.ir_builder.icmp_signed('!=', src_value, src_value.type(0))
             elif is_float(src_bt) and is_float(dst_bt):
                 if src_bt.value <= dst_bt.value:
                     return True, self.ir_builder.fpext(src_value, dst_type.to_ir_type())
+            # 向上转 i8 u8转到f8以上
+            elif (is_integer(src_bt) or src_bt == BasicType.BOOL) and is_float(dst_bt):
+                if src_bt == BasicType.I8:
+                    return True, self.ir_builder.sitofp(src_value, dst_type.to_ir_type())
+                elif src_bt == BasicType.U8 or src_bt == BasicType.BOOL:  # bool转float
+                    print(src_bt)
+                    print('asdasdasdasdkkkkk')
+                    return True, self.ir_builder.uitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.I16) and dst_bt.value >= BasicType.F16.value:
+                    return True, self.ir_builder.sitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.U16) and dst_bt.value >= BasicType.F16.value:
+                    return True, self.ir_builder.uitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.I32) and dst_bt.value >= BasicType.F32.value:
+                    return True, self.ir_builder.sitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.U32) and dst_bt.value >= BasicType.F32.value:
+                    return True, self.ir_builder.uitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.I64) and dst_bt.value >= BasicType.F64.value:
+                    return True, self.ir_builder.sitofp(src_value, dst_type.to_ir_type())
+                elif (src_bt == BasicType.U64) and dst_bt.value >= BasicType.F64.value:
+                    return True, self.ir_builder.uitofp(src_value, dst_type.to_ir_type())
             return False, None
+
 
         return False, None
 
@@ -721,57 +743,95 @@ class CodeGenVisitor():
         # 解析左表达式
         node.lhs_expr.accept(self)
         lhs_type, lhs_value = self.ctx.get_current_assignment_value(node.lhs_expr)
+        # 左边的为什么出来的都是i32的？
 
         # 解析右表达式
         node.rhs_expr.accept(self)
         rhs_type, rhs_value = self.ctx.get_current_assignment_value(node.rhs_expr)
 
-        # 检查左右表达式类型一致
-        if not lhs_type == rhs_type:
-            raise SemanticError(f'type of binary operands are not the same')
+        # # 检查左右表达式类型一致
+        # if not lhs_type == rhs_type:
+        #     raise SemanticError(f'type of binary operands are not the same')
+
         # 检查操作数类型可运算（整形或浮点型）
         if lhs_type.get_kind() != TypeKind.BASIC:
             raise SemanticError(f'unsupported type of binary operands')
 
         # 生成运算指令
-        self.ctx.current_type = lhs_type
-        basic_type = lhs_type.basic_type
+        # self.ctx.current_type = lhs_type
+        # basic_type = lhs_type.basic_type
+        # is_bool = basic_type == BasicType.BOOL
+        # is_integer = not is_bool and not is_float
         irb = self.ctx.ir_builder
-        is_bool = basic_type == BasicType.BOOL
-        is_float = basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
-        is_integer = not is_bool and not is_float
-        cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed
+        is_float = lhs_type in [BasicType.F16, BasicType.F32, BasicType.F64]  ######
+        cmp_instr = self.ctx.ir_builder.fcmp_unordered if is_float else self.ctx.ir_builder.icmp_signed  ######
+
+        is_bool = lambda bt: bt.value == BasicType.BOOL.value
+        is_integer = lambda bt: bt.value >= BasicType.I8.value and bt.value <= BasicType.U64.value
+        is_float = lambda bt: bt.value >= BasicType.F16.value
 
         if node.operator == BinaryOp.PLUS:  # +
-            if is_bool:
-                raise SemanticError('can not do PLUS to bool type')
+            if lhs_type.basic_type.value < rhs_type.basic_type.value:
+                _, lhs_value = self.ctx.convert_type(lhs_type, rhs_type, lhs_value)
+                self.ctx.current_type = rhs_type
+                is_float = rhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
+            else:
+                _, rhs_value = self.ctx.convert_type(rhs_type, lhs_type, rhs_value)
+                self.ctx.current_type = lhs_type
+                is_float = lhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
             value = (irb.fadd if is_float else irb.add)(lhs_value, rhs_value)
+
         elif node.operator == BinaryOp.MINUS:  # -
-            if is_bool:
-                raise SemanticError('can not do MINUS to bool type')
+            if lhs_type.basic_type.value < rhs_type.basic_type.value:
+                _, lhs_value = self.ctx.convert_type(lhs_type, rhs_type, lhs_value)
+                self.ctx.current_type = rhs_type
+                is_float = rhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
+            else:
+                _, rhs_value = self.ctx.convert_type(rhs_type, lhs_type, rhs_value)
+                self.ctx.current_type = lhs_type
+                is_float = lhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
             value = (irb.fsub if is_float else irb.sub)(lhs_value, rhs_value)
+
+
+
         elif node.operator == BinaryOp.MUL:  # *
-            if is_bool:
-                raise SemanticError('can not do MUL to bool type')
+            if lhs_type.basic_type.value < rhs_type.basic_type.value:
+                _, lhs_value = self.ctx.convert_type(lhs_type, rhs_type, lhs_value)
+                self.ctx.current_type = rhs_type
+                is_float = rhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
+            else:
+                _, rhs_value = self.ctx.convert_type(rhs_type, lhs_type, rhs_value)
+                self.ctx.current_type = lhs_type
+                is_float = lhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
             value = (irb.fmul if is_float else irb.mul)(lhs_value, rhs_value)
         elif node.operator == BinaryOp.DIV:  # /
-            if is_bool:
-                raise SemanticError('can not do DIV to bool type')
+            if lhs_type.basic_type.value < rhs_type.basic_type.value:
+                _, lhs_value = self.ctx.convert_type(lhs_type, rhs_type, lhs_value)
+                self.ctx.current_type = rhs_type
+                is_float = rhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
+            else:
+                _, rhs_value = self.ctx.convert_type(rhs_type, lhs_type, rhs_value)
+                self.ctx.current_type = lhs_type
+                is_float = lhs_type.basic_type in [BasicType.F16, BasicType.F32, BasicType.F64]
             if is_float:
                 value = irb.fdiv(lhs_value, rhs_value)
-            elif is_integer:
-                if basic_type in I_BASICTYPES:
+            else:
+                if self.ctx.current_type.basic_type in I_BASICTYPES:
                     value = irb.sdiv(lhs_value, rhs_value)
                 else:
                     value = irb.udiv(lhs_value, rhs_value)
-        elif node.operator == BinaryOp.AND:  # &
+        elif node.operator == BinaryOp.AND:  # &  只有bool和inter可以，且inter时必须要相同
+            # is_lhs_int_bool = is_bool(lhs_type.basic_type) or is_integer(lhs_type.basic_type)
+            # is_rhs_int_bool = is_bool(rhs_type.basic_type) or is_integer(rhs_type.basic_type)
+            # print(lhs_type.basic_type)
+            # print(rhs_type.basic_type)
             if is_integer:
-                value = irb.and_((lhs_value, rhs_value))
+                value = irb.and_(lhs_value, rhs_value)
             else:
                 raise SemanticError('unsupported type of AND')
         elif node.operator == BinaryOp.OR:  # |
             if is_integer:
-                value = irb.or_((lhs_value, rhs_value))
+                value = irb.or_(lhs_value, rhs_value)
             else:
                 raise SemanticError('unsupported type of OR')
         elif node.operator == BinaryOp.XOR:  # ^
@@ -781,7 +841,7 @@ class CodeGenVisitor():
                 raise SemanticError('unsupported type of XOR')
         elif node.operator == BinaryOp.MOD:  # %
             if is_integer:
-                if basic_type in I_BASICTYPES:
+                if lhs_type in I_BASICTYPES:  ##########
                     value = irb.srem(lhs_value, rhs_value)
                 else:
                     value = irb.urem(lhs_value, rhs_value)
@@ -815,22 +875,22 @@ class CodeGenVisitor():
                 raise SemanticError('unsupported type of LOGICAL_AND')
         elif node.operator == BinaryOp.NOT_EQUAL:  # !=
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('!=', lhs_value, rhs_value)
+            value = cmp_instr('!=', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.EQUAL:  # ==
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('==', lhs_value, rhs_value)
+            value = cmp_instr('==', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.LESS_EQUAL:  # <=
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('<=', lhs_value, rhs_value)
+            value = cmp_instr('<=', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.LESS:  # <
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('<', lhs_value, rhs_value)
+            value = cmp_instr('<', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.GREATER_EQUAL:  # >=
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('>=', lhs_value, rhs_value)
+            value = cmp_instr('>=', lhs_value, rhs_value)  ######
         elif node.operator == BinaryOp.GREATER:  # >
             self.ctx.current_type = Type(basic_type=BasicType.BOOL)
-            value = cmp_instr('>', lhs_value, rhs_value)
+            value = cmp_instr('>', lhs_value, rhs_value)  ######
         else:
             raise NotImplementedError(f'binary op {node.operator} not implemented')
         self.ctx.current_value = value
@@ -1013,14 +1073,18 @@ class CodeGenVisitor():
         # 首先尝试能否使用自动转换规则
         cvt_success, cvt_value = self.ctx.convert_type(src_type, target_type, value)
         if cvt_success:
+            print('cvt_success')
             self.ctx.current_type = target_type
+            print('target_type.basic_type', target_type.basic_type)
             self.ctx.current_value = cvt_value
+            print('cvt_value', cvt_value)
             return
 
         if (src_type.get_kind() == TypeKind.REFERENCE):
             value_type = src_type.clone().remove_ref()
             _, value = self.ctx.convert_type(src_type, value_type, value)
             src_type = value_type
+
         # 否则使用尝试使用强制转换规则
         # 1. 向下转换: i64 -> i32 -> i16 -> i8, f64 -> f32 -> f16
         # 2. 浮点与(整数,bool)互相转换: iX <-> fX, bool <-> fX
@@ -1043,14 +1107,19 @@ class CodeGenVisitor():
                     self.ctx.current_value = self.ctx.ir_builder.fptoui(value, target_type.to_ir_type())
             # int, bool -> float, uint, sint
             elif is_integer(src_bt) or is_bool(src_bt):
+                print('aaa')
                 if is_integer(target_bt):
+                    print('bbb')
                     self.ctx.current_type = target_type
                     self.ctx.current_value = self.ctx.ir_builder.trunc(value, target_type.to_ir_type())
                 elif is_float(target_bt) :
+                    print('ccc')
                     if src_bt in I_BASICTYPES:
+                        print('ddd')
                         self.ctx.current_type = target_type
                         self.ctx.current_value = self.ctx.ir_builder.sitofp(value, target_type.to_ir_type())
                     else :
+                        print('ffff')
                         self.ctx.current_type = target_type
                         self.ctx.current_value = self.ctx.ir_builder.uitofp(value, target_type.to_ir_type())
             return
