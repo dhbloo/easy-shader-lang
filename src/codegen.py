@@ -5,6 +5,7 @@ from llvmlite import ir
 from .enums import BasicType, BinaryOp, TypeKind, UnaryOp
 from .symbol import SymbolTable, Type
 from .error import SemanticError
+from .utils.misc import merge_matched
 from . import ast
      
 I_BASICTYPES = [BasicType.I8, BasicType.I16, BasicType.I32, BasicType.I64]
@@ -28,6 +29,7 @@ class CodeGenContext():
         self.current_break_block : ir.Block = None
         self.current_continue_block : ir.Block = None
         self.current_object_value : ir.Value = None
+        self.current_generic_spec_type : ir.Type = None
         self.create_global_init_function()
 
     def create_global_init_function(self):
@@ -248,6 +250,7 @@ class CodeGenVisitor():
                 # 替换符号表中的符号
                 func_symbol = self.ctx.scope_stack[-1][0].query_symbol(node.func_decl.identifier)
                 func_symbol.value = new_func_value
+                func_value = new_func_value
             
             # 检查函数指令流结束
             if not self.ctx.ir_builder.basic_block.is_terminated:
@@ -257,9 +260,10 @@ class CodeGenVisitor():
                     raise SemanticError(f'must return a expression of type {ret_type} at the end of function')
 
             self.ctx.pop_scope()
+            self.ctx.current_value = func_value
         # 否则此函数为泛型函数，记录未解析节点至函数类型中
         else:
-            func_type.unfinished_node = node.block_stmt
+            func_type.unfinished_node = node
 
     @visitor.when(ast.SimpleType)
     def visit(self, node: ast.SimpleType):
@@ -278,7 +282,20 @@ class CodeGenVisitor():
 
         # 对于泛型复杂类型，根据以上列表得到其实例化后的类型
         if complex_type.has_generics():
-            complex_type = complex_type.specialize(generic_specialization_list)
+            num_generics = len(complex_type.generics_type_list)
+            if num_generics != len(generic_specialization_list):
+                raise SemanticError(f'incorrect number of generics specilization ({num_generics} != {len(generic_specialization_list)})')
+            
+            # 克隆一个新的复杂类型
+            complex_type = complex_type.clone(clone_symbol_table=True)
+
+            # 替换其泛型参数列表的类型
+            for i in range(num_generics):
+                old_generic_name = complex_type.generics_type_list[i].generic_name
+                complex_type.generics_type_list[i] = generic_specialization_list[i]
+                complex_type.symbol_table.replace_local_type(old_generic_name, generic_specialization_list[i])
+        elif len(generic_specialization_list) > 0:
+            raise SemanticError('specify generics to a non-generic struct/interface')
 
         self.ctx.current_type = complex_type
 
@@ -306,9 +323,17 @@ class CodeGenVisitor():
 
     @visitor.when(ast.FunctionDecl)
     def visit(self, node: ast.FunctionDecl):
+        # 如果是实例化泛型函数
+        if self.ctx.current_generic_spec_type:
+            func_type = self.ctx.current_generic_spec_type
+            self.ctx.current_type = func_type
+            self.ctx.current_generic_spec_type = None
+            generic_spec_pass = True
         # 首先解析函数签名得到函数类型
-        node.func_sign.accept(self)
-        func_type = self.ctx.current_type
+        else:
+            node.func_sign.accept(self)
+            func_type = self.ctx.current_type
+            generic_spec_pass = False
 
         # 对于非泛型函数，此时可以构建ir.Function
         if not func_type.has_generics():
@@ -325,30 +350,31 @@ class CodeGenVisitor():
             else:
                 func_name = node.identifier
 
+            # 对于实例化的函数，将其实例化的实际类型加到后边
+            if generic_spec_pass:
+                func_name += f'<<{str(func_type).replace(" ", "")}>>'
+                # 对于实例化的泛型函数，如果相同的实例化已经产生过，直接使用之前的
+                try:
+                    self.ctx.current_value = self.ctx.module.get_global(func_name)
+                    return
+                except:
+                    pass
+
             func_value = ir.Function(module, func_type.to_ir_type().pointee, func_name)
         # 否则对于泛型函数，其符号值目前留空，等待实例化时再生成值
         else:
             func_value = None
+            func_type.unfinished_node = node
 
-        # 将该函数符号加入到当前符号表中
-        self.ctx.symbol_table.add_symbol(node.identifier, func_type, func_value)
+        # 将该函数符号加入到当前符号表中（对于泛型实例化则不需要加入）
+        if not generic_spec_pass:
+            self.ctx.symbol_table.add_symbol(node.identifier, func_type, func_value)
 
         # 设置当前的值为函数符号值
         self.ctx.current_value = func_value
 
     @visitor.when(ast.FunctionSignature)
     def visit(self, node: ast.FunctionSignature):
-        if node.return_type_spec:
-            # 返回值从return_type_spec得到
-            node.return_type_spec.accept(self)
-            ret_type = self.ctx.current_type.clone()
-        else:
-            # 返回值是Auto
-            ret_type = Type()
-
-        # 创建函数类型
-        func_type = Type(func_ret_type=ret_type)
-
         # 为函数建立符号表
         # 如果上层符号表是struct或interface的符号表，则跳过
         if (self.ctx.symbol_table.parent_type is not None and 
@@ -356,13 +382,26 @@ class CodeGenVisitor():
             parent_symbol_table = self.ctx.symbol_table.parent
         else:
             parent_symbol_table = self.ctx.symbol_table
+
+        # 创建函数类型
+        func_type = Type()
         func_type.add_symbol_table(parent_symbol_table)
 
-        # 处理泛型类型声明列表
-        for generics_type in node.generics_type_list:
-            generics_type.accept(self)
-            # 将泛型类型加入该函数类型的泛型列表中
+        # 处理泛型类型声明列表，加入该函数类型的泛型列表和符号表
+        for generics_type_node in node.generics_type_list:
+            generics_type_node.accept(self)
             func_type.add_generics_type(self.ctx.current_type)
+
+        # 进入函数局部作用域
+        self.ctx.push_scope(func_type.symbol_table, self.ctx.ir_builder, self.ctx.deduced_ret_type)
+
+        if node.return_type_spec:
+            # 返回值从return_type_spec得到
+            node.return_type_spec.accept(self)
+            func_type.add_func_ret_type(self.ctx.current_type.clone())
+        else:
+            # 返回值是Auto
+            func_type.add_func_ret_type(Type())
 
         # 处理函数的参数列表
         for param_idx, param in enumerate(node.parameter_decl_list):
@@ -384,6 +423,8 @@ class CodeGenVisitor():
             # 此时函数参数符号还没有值，需要等到后续的函数定义时才会产生值
             param_symbol = func_type.symbol_table.add_symbol(param.identifier, param_type)
             func_type.add_func_param(param_symbol)
+
+        self.ctx.pop_scope()
 
         # 函数签名的声明解析完毕，函数类型构建完成
         self.ctx.current_type = func_type
@@ -960,9 +1001,13 @@ class CodeGenVisitor():
             is_function = symbol.type.get_kind() == TypeKind.FUNCTION
             if is_function:
                 self.ctx.current_type = symbol.type
-                # 对于函数类型的符号，如果其为函数值的指针，取出其对应的函数值
-                if is_function and isinstance(symbol.value.type.pointee, ir.PointerType):
-                    self.ctx.current_value = self.ctx.ir_builder.load(symbol.value)
+                # 对于泛型函数，先跳过处理
+                if symbol.value is None:
+                    self.ctx.current_value = None
+                else:
+                    # 对于函数类型的符号，如果其为函数值的指针，取出其对应的函数值
+                    if isinstance(symbol.value.type.pointee, ir.PointerType):
+                        self.ctx.current_value = self.ctx.ir_builder.load(symbol.value)
             else:
                 self.ctx.current_type = symbol.type.clone().add_ref()
 
@@ -1163,7 +1208,7 @@ class CodeGenVisitor():
                 param_type, param_value = self.ctx.current_type, self.ctx.current_value
                 cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)
                 if not cvt_success:
-                    raise SemanticError(f'can not convert {idx}th parameter type {param_type} to {param_symbol.type}')
+                    raise SemanticError(f'can not convert {idx+1}th parameter type from {param_type} to {param_symbol.type}')
                 param_values.append(param_value)
 
             # 调用构造函数
@@ -1222,20 +1267,84 @@ class CodeGenVisitor():
         if len(func_type.func_params) != n_args:
             raise SemanticError(f'call expression must have the same number of parameters with function ({n_args} != {len(func_type.func_params)})')
 
+        # 显式实例化泛型函数的类型参数
+        if func_value is None:
+            if len(node.generics_spec_list) > len(func_type.generics_type_list):
+                raise SemanticError(f'more generics types are specified ({len(node.generics_spec_list)} > {len(func_type.generics_type_list)})')
+
+            # 得到显式实例化参数列表
+            func_type = func_type.clone(clone_symbol_table=True)
+            generics_spec_types = []
+            generics_spec_list = {}
+            for generics_spec in node.generics_spec_list:
+                generics_spec.accept(self)
+                generics_type = func_type.generics_type_list[len(generics_spec_types)]
+                generics_spec_list[generics_type.generic_name] = self.ctx.current_type
+                generics_spec_types.append(self.ctx.current_type)
+
+            # 替换参数和返回值中的潜在泛型类型
+            if len(generics_spec_list) > 0:
+                func_type = func_type.specialize(generics_spec_list)
+
         param_values = []
         # 处理成员函数调用（在第一个参数增加self）
         if isinstance(node.func_expr, ast.MemberExpression):
             assert self.ctx.current_object_value is not None
             param_values.append(self.ctx.current_object_value)
+            if func_type.func_params[0].type.is_generics():
+                raise NotImplementedError()
 
         # 处理调用参数
-        for idx, (param_symbol, param) in enumerate(zip(func_type.func_params, node.param_list)):
+        all_matched = {}
+        param_array_dims = {}
+        for idx, (param_symbol, param) in enumerate(zip(func_type.func_params[len(param_values):], node.param_list)):
             param.accept(self)
             param_type, param_value = self.ctx.current_type, self.ctx.current_value
-            cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)
-            if not cvt_success:
-                raise SemanticError(f'can not convert {idx}th parameter type {param_type} to {param_symbol.type}')
+
+            # 处理泛型函数参数
+            if param_symbol.type.is_generics():
+                # 用实参类型匹配推导泛型类型
+                match_success, matched = param_symbol.type.match_generics(param_type)
+                if not match_success:
+                    raise SemanticError(f'can not deduce type {param_symbol.type} from {param_type}')
+
+                # 合并已有的泛型类型推导结果
+                all_matched = merge_matched(all_matched, matched)
+                if all_matched is None:
+                    raise SemanticError(f'conflicts in generics type deduction')
+
+                # 记录实参数组维数
+                if len(param_type.array_dims) > 0:
+                    param_array_dims[param_symbol.id] = param_type.array_dims
+            # 对于非泛型类型，尝试进行自动类型转换
+            else:
+                cvt_success, param_value = self.ctx.convert_type(param_type, param_symbol.type, param_value)
+                if not cvt_success:
+                    raise SemanticError(f'can not convert {idx+1}th parameter type from {param_type} to {param_symbol.type}')
+
             param_values.append(param_value)
+
+        # 实例化泛型函数
+        if func_value is None:
+            # 用推导得到的泛型类型填充剩下的泛型参数
+            for i in range(len(generics_spec_types), len(func_type.generics_type_list)):
+                generics_type = func_type.generics_type_list[i]
+                if generics_type.generic_name not in all_matched:
+                    raise SemanticError(f'unspecified generics type {generics_type}')
+                generics_spec_types.append(all_matched[generics_type.generic_name])
+
+            # 实例化函数类型，并清空函数的泛型参数列表
+            generics_spec_list = {}
+            for i, generics_spec in enumerate(generics_spec_types):
+                generic_name = func_type.generics_type_list[i].generic_name
+                generics_spec_list[generic_name] = generics_spec
+            func_type = func_type.specialize(generics_spec_list, param_array_dims)
+            func_type.generics_type_list.clear()
+
+            # 重新解析AST节点得到实例化参数
+            self.ctx.current_generic_spec_type = func_type
+            func_type.unfinished_node.accept(self)
+            func_value = self.ctx.current_value
 
         self.ctx.current_value = self.ctx.ir_builder.call(func_value, param_values)
         self.ctx.current_type = func_type.func_ret_type

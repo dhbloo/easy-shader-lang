@@ -1,0 +1,36 @@
+
+func max<T>(array: T[4] ref) -> T;
+func max2<T, U>(array: T[4] ref) -> U;
+
+func normalize<U>(v : U) -> U {
+    return v;
+}
+
+func add<T, U>(x : T, y : U) -> f32 {
+    return (f32)x + (f32)y;
+}
+
+func normalize2(v) {
+    return v;
+}
+
+func max_element<T>(v: T[] ref, i : i32) -> T {
+    return v[i];
+}
+
+func main() -> void {
+    let v = i32[4]();
+    let u = f32[6]();
+    let m = max(ref(v));
+    let n = max2 '<i32, f64>(ref(v));
+
+    let x = normalize(1);
+    let y = normalize '<f32>(1.0f);
+    let z = normalize '<i32>(1);
+
+    let a = add(1.0f, 1);
+    let b = normalize2(1.0f);
+
+    let c = max_element(v, 1);
+    let d = max_element(u, 2);
+}
