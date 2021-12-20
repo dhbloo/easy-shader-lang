@@ -1,0 +1,197 @@
+type vec4 = f32[4];
+type vec3 = f32[3];
+type vec2 = f32[2];
+
+let outColor = vec4();
+
+let coord = vec2();
+let resolution = vec2();
+let time = f32();
+
+let skytop = vec3(0.05f, 0.2f, 0.5f);
+let light = vec3(0.1f, 0.25f, 0.9f);
+let cloudrange = vec2(0.0f, 10000.0f);
+
+
+func min(a, b) { if (a <= b) return a; else return b; }
+func max(a, b) { if (a >= b) return a; else return b; }
+func clamp(x, t1, t2) { return min(max(x, t1), t2); }
+func fract(x : f32) { return x - floor(x); }
+func mix(x : f32, y : f32, t : f32) { return x * (1 - t) + y * t; }
+func smoothstep(t1 : f32, t2 : f32, x : f32) {
+    x = clamp((x - t1) / (t2 - t1), 0.0f, 1.0f);
+    return x * x * (3 - 2 * x);
+}
+func hash(n : f32) {
+    return fract(cos(n) * 114514.1919f);
+}
+
+func normalize(v : vec3) {
+    let invL = 1.0f / sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    v[0] = v[0] * invL;
+    v[1] = v[1] * invL;
+    v[2] = v[2] * invL;
+    return v;
+}
+
+func floorv3(v : vec3) {
+    v[0] = floor(v[0]);
+    v[1] = floor(v[1]);
+    v[2] = floor(v[2]);
+    return v;
+}
+
+func fractv3(v : vec3) {
+    v[0] = fract(v[0]);
+    v[1] = fract(v[1]);
+    v[2] = fract(v[2]);
+    return v;
+}
+
+func smoothstepv3(t1 : f32, t2 : f32, v : vec3) {
+    v[0] = smoothstep(t1, t2, v[0]);
+    v[1] = smoothstep(t1, t2, v[1]);
+    v[2] = smoothstep(t1, t2, v[2]);
+    return v;
+}
+
+func mixv3(x : vec3, y : vec3, t : f32) {
+    let v = vec3();
+    v[0] = mix(x[0], y[0], t);
+    v[1] = mix(x[1], y[1], t);
+    v[2] = mix(x[2], y[2], t);
+    return v;
+}
+
+func addv(x : vec3, y : vec3) {
+    let r = vec3();
+    r[0] = x[0] + y[0];
+    r[1] = x[1] + y[1];
+    r[2] = x[2] + y[2];
+    return r;
+}
+
+func subv(x : vec3, y : vec3) {
+    let r = vec3();
+    r[0] = x[0] - y[0];
+    r[1] = x[1] - y[1];
+    r[2] = x[2] - y[2];
+    return r;
+}
+
+func mulv(x : vec3, y : vec3) {
+    let r = vec3();
+    r[0] = x[0] * y[0];
+    r[1] = x[1] * y[1];
+    r[2] = x[2] * y[2];
+    return r;
+}
+
+func mul(t : f32, x : vec3) {
+    x[0] = x[0] * t;
+    x[1] = x[1] * t;
+    x[2] = x[2] * t;
+    return x;
+}
+
+func divv(x : vec3, y : vec3) {
+    let r = vec3();
+    r[0] = x[0] / y[0];
+    r[1] = x[1] / y[1];
+    r[2] = x[2] / y[2];
+    return r;
+}
+
+func dot(x : vec3, y : vec3) -> f32 {
+    return x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+}
+
+func cross(x : vec3, y : vec3) {
+    let r = vec3();
+    r[0] = x[1] * y[2] - x[2] * y[1];
+    r[1] = x[2] * y[0] - x[0] * y[2];
+    r[2] = x[0] * y[1] - x[1] * y[0];
+    return r;
+}
+
+func noise(x : vec3) -> f32 {
+    x = floorv3(x);
+    let f = smoothstepv3(0.0f, 1.0f, fractv3(x));
+
+    let n : f32 = x[0] + x[1] * 10 + x[2] * 100;
+
+    let v00 = mix(hash(n), hash(n+1), f[0]);
+    let v01 = mix(hash(n+10), hash(n+11), f[0]);
+    let v10 = mix(hash(n+100), hash(n+101), f[0]);
+    let v11 = mix(hash(n+110), hash(n+111), f[0]);
+    return mix(mix(v00, v01, f[1]), mix(v10, v11, f[1]), f[2]);
+}
+
+func fbm(p : vec3) -> f32 {
+    let f = 0.5f * noise(p);
+    f = f + 0.25f * noise(p);
+    #f = f + 0.125f * noise(addv(mul(2.0f, p), vec3(0.67f, 0.8f, 0.2f)));
+    return f;
+}
+
+func camera(time : f32) -> vec3 {
+    let v = vec3();
+    v[0] = 5000.0f * sin(time);
+    v[1] = 5000.0f + 1500.0f * sin(time * 0.5f);
+    v[2] = 6000.0f * time;
+    return v;
+}
+
+func main() {
+    outColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    light = normalize(light);
+
+    let u = 2 * coord[0] / resolution[0] - 1;
+    let v = 2 * coord[1] / resolution[1] - 1;
+    u = u * (resolution[0] / resolution[1]);
+
+    let t = time + 57.0f;
+    let campos = camera(t);
+    let camtar = camera(t + 0.4f);
+
+    let front = normalize(subv(camtar, campos));
+    let right = normalize(cross(front, vec3(0.0f, 1.0f, 0.0f)));
+    let up = normalize(cross(right, front));
+    let fragAt = normalize(addv(mul(u, right), addv(mul(v, up), front)));
+
+    # clouds
+    let sum = vec4();
+    for (let depth = 0.0f; depth < 100000.0f; depth = depth + 300.0f) {
+        let ray = addv(campos, mul(depth, fragAt));
+        if (cloudrange[0] < ray[1] && ray[1] < cloudrange[1]) {
+            let alpha = smoothstep(0.5f, 1.0f, fbm(mul(0.00025f, ray)));
+            let localcolor = mixv3(vec3(1.1f, 1.05f, 1.0f), vec3(0.3f, 0.3f, 0.2f), alpha);
+            alpha = (1.0f - sum[3]) * alpha;
+            sum[0] = sum[0] + localcolor[0] * alpha;
+            sum[1] = sum[1] + localcolor[1] * alpha;
+            sum[2] = sum[2] + localcolor[2] * alpha;
+            sum[3] = sum[3] + alpha;
+        }
+    }
+
+    let alpha = smoothstep(0.7f, 1.0f, sum[3]);
+    let rr = sum[3] + 0.0001f;
+    sum[0] = sum[0] / rr;
+    sum[1] = sum[1] / rr;
+    sum[2] = sum[2] / rr;
+
+    let sundot = clamp(dot(fragAt, light), 0.0f, 1.0f);
+    let col = mul(0.8f, skytop);
+    col = addv(col, mul(0.47f * pow(sundot, 350.0f), vec3(1.6f, 1.4f, 1.0f)));
+    col = addv(col, mul(0.4f * pow(sundot, 2.0f), vec3(0.8f, 0.9f, 1.0f)));
+
+    let sum3 = vec3();
+    sum3[0] = sum[0];
+    sum3[1] = sum[1];
+    sum3[2] = sum[2];
+    col = mixv3(col, sum3, sum[3]);
+
+    outColor[0] = col[0];
+    outColor[1] = col[1];
+    outColor[2] = col[2];
+}

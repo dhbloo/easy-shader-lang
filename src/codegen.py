@@ -1121,7 +1121,7 @@ class CodeGenVisitor():
 
         # 检测类型是否为数组
         if val_array_type.get_kind() != TypeKind.ARRAY:
-            raise SemanticError('array is not an array type')
+            raise SemanticError('expression indexed is not an array type')
 
         # 解析索引表达式
         node.index_expr.accept(self)
