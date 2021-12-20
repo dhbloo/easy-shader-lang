@@ -6,16 +6,18 @@ func normalize<U>(v : U) -> U {
     return v;
 }
 
-func add<T, U>(x : T, y : U) -> f32 {
-    return (f32)x + (f32)y;
-}
-
 func normalize2(v) {
     return v;
 }
 
+func add<T, U>(x : T, y : U) -> f32 {
+    return (f32)x + (f32)y;
+}
+
 func max_element<T>(v: T[] ref, i : i32) -> T {
-    return v[i];
+    let a = normalize(v[i]);
+    let b = normalize2(v[i]);
+    return a + b;
 }
 
 func main() -> void {
@@ -31,6 +33,6 @@ func main() -> void {
     let a = add(1.0f, 1);
     let b = normalize2(1.0f);
 
-    let c = max_element(v, 1);
-    let d = max_element(u, 2);
+    let c = max_element(ref(v), 1);
+    let d = max_element(ref(u), 2);
 }

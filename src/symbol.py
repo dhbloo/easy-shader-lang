@@ -26,7 +26,7 @@ class SymbolTable():
     def is_root(self) -> bool:
         return self.parent is None
 
-    def get_root(self) -> Symbol:
+    def get_root(self) -> SymbolTable:
         if self.is_root():
             return self
         else:

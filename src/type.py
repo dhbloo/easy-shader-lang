@@ -224,7 +224,7 @@ class Type():
             for i, generics_type in enumerate(self.generics_type_list):
                 if i > 0:
                     generic_str += ', '
-                generic_str += f'{generics_type}'
+                generic_str += f'{generics_type}' if generics_type.generic_name else '""'
             generic_str += '>'
             return generic_str
 
@@ -367,6 +367,9 @@ class Type():
                             param_type.array_dims[i] = array_dims[i]
                 new_param_symbol = func_type.symbol_table.replace_local_symbol_type(param_symbol.id, param_type)
                 func_type.func_params[i] = new_param_symbol
+            for generic_name, spec_type in generic_specialization_list.items():
+                if len(generic_name) > 0:
+                    func_type.symbol_table.replace_local_type(generic_name, spec_type)
             return func_type
         else:
             assert False

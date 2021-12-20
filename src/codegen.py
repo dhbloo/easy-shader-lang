@@ -161,6 +161,9 @@ class CodeGenVisitor():
         var_init_type, var_value = self.ctx.get_current_assignment_value(node.init_expr)
         var_type = var_type or var_init_type
 
+        if var_type.get_kind() == TypeKind.BASIC and var_type.basic_type == BasicType.VOID:
+            raise SemanticError('can not declare a variable with void type')
+
         # 初始化表达式类型转换
         cvt_success, var_value = self.ctx.convert_type(var_init_type, var_type, var_value)
         if not cvt_success:
@@ -169,7 +172,6 @@ class CodeGenVisitor():
         # 增加 const 标记
         if node.is_const:
             var_type.add_const()
-        
 
         # 添加变量至符号表
         # 1. 对于全局变量，分配全局空间，需要在其initializer中加入初始化表达式
@@ -192,6 +194,9 @@ class CodeGenVisitor():
 
     @visitor.when(ast.FunctionDefinition)
     def visit(self, node: ast.FunctionDefinition):
+        # 是否是泛型实例化pass
+        generic_spec_pass = self.ctx.current_generic_spec_type is not None
+
         # 解析函数签名与符号
         node.func_decl.accept(self)
         func_type, func_value = self.ctx.current_type, self.ctx.current_value
@@ -199,8 +204,13 @@ class CodeGenVisitor():
         # 若当前函数的声明已实例化（值存在），则直接解析函数体
         if func_value:
             assert isinstance(func_value, ir.Function)
-            entry_block = func_value.append_basic_block('entry')
-            func_ir_builder = ir.IRBuilder(entry_block)
+            # 如果该函数已经解析过，则无需重复解析并加入到全局模块中
+            if len(func_value.blocks) == 0:
+                entry_block = func_value.append_basic_block('entry')
+                func_ir_builder = ir.IRBuilder(entry_block)
+            else:
+                temp_func = ir.Function(ir.Module(), func_value.function_type, func_value.name)
+                func_ir_builder = ir.IRBuilder(temp_func.append_basic_block('entry'))
 
             # 创建函数参数局部变量，并储存函数入参值
             assert len(func_type.func_params) == len(func_value.args)
@@ -221,14 +231,19 @@ class CodeGenVisitor():
                 func_type.func_ret_type = ret_type
                 new_func_type = func_value.function_type
                 new_func_type.return_type = ret_type.to_ir_type()
-                # 重新构建函数值
-                new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
-                for block in func_value.blocks:
-                    new_func_value.basic_blocks.append(block)
-                # 替换符号表中的符号
-                func_symbol = self.ctx.scope_stack[-1][0].query_symbol(node.func_decl.identifier)
-                func_symbol.value = new_func_value
-                func_value = new_func_value
+                # 仅对于首次推导重新构建函数值
+                try:
+                    self.ctx.module.get_global(func_value.name)
+                except:
+                    # 重新构建函数值
+                    new_func_value = ir.Function(self.ctx.module, new_func_type, func_value.name)
+                    for block in func_value.blocks:
+                        new_func_value.basic_blocks.append(block)
+                    # 替换符号表中的符号（仅在非实例化时进行）
+                    if not generic_spec_pass:
+                        func_symbol = self.ctx.scope_stack[-1][0].query_symbol(node.func_decl.identifier)
+                        func_symbol.value = new_func_value
+                    func_value = new_func_value
             
             # 检查函数指令流结束
             if not self.ctx.ir_builder.basic_block.is_terminated:
@@ -338,9 +353,11 @@ class CodeGenVisitor():
                 except:
                     pass
 
+            assert not func_type.is_generics()
             func_value = ir.Function(module, func_type.to_ir_type().pointee, func_name)
         # 否则对于泛型函数，其符号值目前留空，等待实例化时再生成值
         else:
+            assert not generic_spec_pass
             func_value = None
             func_type.unfinished_node = node
 
@@ -1200,6 +1217,7 @@ class CodeGenVisitor():
 
         # 显式实例化泛型函数的类型参数
         if func_value is None:
+            assert func_type.has_generics()
             if len(node.generics_spec_list) > len(func_type.generics_type_list):
                 raise SemanticError(f'more generics types are specified ({len(node.generics_spec_list)} > {len(func_type.generics_type_list)})')
 
@@ -1216,6 +1234,8 @@ class CodeGenVisitor():
             # 替换参数和返回值中的潜在泛型类型
             if len(generics_spec_list) > 0:
                 func_type = func_type.specialize(generics_spec_list)
+        else:
+            assert not func_type.has_generics()
 
         param_values = []
         # 处理成员函数调用（在第一个参数增加self）
@@ -1230,7 +1250,7 @@ class CodeGenVisitor():
         param_array_dims = {}
         for idx, (param_symbol, param) in enumerate(zip(func_type.func_params[len(param_values):], node.param_list)):
             param.accept(self)
-            param_type, param_value = self.ctx.current_type, self.ctx.current_value
+            param_type, param_value = self.ctx.get_current_assignment_value(param)
 
             # 处理泛型函数参数
             if param_symbol.type.is_generics():
@@ -1264,9 +1284,10 @@ class CodeGenVisitor():
                     raise SemanticError(f'unspecified generics type {generics_type}')
                 generics_spec_types.append(all_matched[generics_type.generic_name])
 
-            # 实例化函数类型，并清空函数的泛型参数列表
+            # 实例化函数类型，并清空函数的泛型参数列表，替换其符号表中的符号
             generics_spec_list = {}
             for i, generics_spec in enumerate(generics_spec_types):
+                assert func_type.generics_type_list[i].get_kind() == TypeKind.GENERIC
                 generic_name = func_type.generics_type_list[i].generic_name
                 generics_spec_list[generic_name] = generics_spec
             func_type = func_type.specialize(generics_spec_list, param_array_dims)
