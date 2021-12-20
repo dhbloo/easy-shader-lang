@@ -149,3 +149,6 @@ cython_debug/
 parsetab.py
 parser.out
 parselog.txt
+*.exe
+*.bc
+*.spv

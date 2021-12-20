@@ -46,9 +46,11 @@ class SymbolTable():
 
         self.type_table[name] = type
 
-    def add_unnamed_type(self, type : Type) -> None:
-        self.add_type(f'__unnamed_type_{self.unnamed_index}', type)
+    def add_unnamed_type(self, type : Type) -> str:
+        name = f'__unnamed_type_{self.unnamed_index}'
+        self.add_type(name, type)
         self.unnamed_index += 1
+        return name
 
     def query_type(self, name : str) -> Type:
         if name in self.type_table:

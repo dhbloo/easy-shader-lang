@@ -1,0 +1,15 @@
+# 显式定义泛型函数，不给定返回值类型
+func foo<T, U>(a : T, b : U) {
+    return a + b;
+}
+# 隐式定义泛型函数，不给定参数类型和返回值类型（其函数签名实际上等价于foo）
+func bar(a, b) {
+    return a * b;
+}
+
+func main(){
+    let a = 1;           # 变量a自动推导出类型i32
+    let b = 1.0f;        # 变量b自动推导出类型f32
+    let c = foo(a, b);   # 自动推导出c的类型为f32
+    let d = bar(b, a);   # 自动推导出d的类型为f32
+}

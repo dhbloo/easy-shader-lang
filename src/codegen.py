@@ -30,7 +30,11 @@ class CodeGenContext():
         self.current_continue_block : ir.Block = None
         self.current_object_value : ir.Value = None
         self.current_generic_spec_type : ir.Type = None
+        self.declare_intrinsic()
         self.create_global_init_function()
+
+    def declare_intrinsic(self):
+        self.module.declare_intrinsic("@llvm.fabs.f32", (), ir.FunctionType(ir.FloatType(), (ir.FloatType(),)))
 
     def create_global_init_function(self):
         """创建全局初始化函数"""

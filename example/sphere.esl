@@ -1,0 +1,16 @@
+type vec4 = f32[4];
+type vec2 = f32[2];
+
+let outColor = vec4();
+
+let info = vec2();
+let time = f32();
+
+func main() {
+    let x = info[0] - 0.5f;
+    let y = info[1] - 0.5f;
+    if (x * x + y * y < 0.25f)
+        outColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    else
+        outColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+}

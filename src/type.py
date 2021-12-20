@@ -113,7 +113,7 @@ class Type():
         if len(generics_type.generic_name) > 0:
             self.symbol_table.add_type(generics_type.generic_name, generics_type)
         else:
-            self.symbol_table.add_unnamed_type(generics_type)
+            generics_type.generic_name = self.symbol_table.add_unnamed_type(generics_type)
         return self
 
     def add_struct_base_type(self, base_type : Type) -> Type:
@@ -368,8 +368,8 @@ class Type():
                 new_param_symbol = func_type.symbol_table.replace_local_symbol_type(param_symbol.id, param_type)
                 func_type.func_params[i] = new_param_symbol
             for generic_name, spec_type in generic_specialization_list.items():
-                if len(generic_name) > 0:
-                    func_type.symbol_table.replace_local_type(generic_name, spec_type)
+                assert len(generic_name) > 0
+                func_type.symbol_table.replace_local_type(generic_name, spec_type)
             return func_type
         else:
             assert False
